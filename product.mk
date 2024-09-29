@@ -20,6 +20,11 @@ PRODUCT_PACKAGES += \
     UpdaterOverlayExtraGMS
 endif
 
+# LMO Freeform
+PRODUCT_PACKAGES += \
+    LMOFreeform \
+    LMOFreeformSidebar
+
 # MiuiCamera
 $(call inherit-product-if-exists, device/xiaomi/$(shell echo -n $(TARGET_PRODUCT) | sed -e 's/^[a-z]*_//g')-miuicamera/device.mk)
 
