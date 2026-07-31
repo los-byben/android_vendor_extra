@@ -1,3 +1,8 @@
+telegram() {
+    local message="$1"
+    ~/telegram.sh/telegram "$message"
+}
+
 apply_patches() {
     cd ${ANDROID_BUILD_TOP}
     PATCHES_PATH=$PWD/vendor/extra/patches
@@ -30,6 +35,7 @@ release() {
     fi
 
     echo -e "\e[32m[INFO]\e[0m Starting release for device: ${device} (${type} variant)"
+    telegram "[INFO] Starting release for device: ${device} (${type} variant)"
 
     [[ -d "${ANDROID_BUILD_TOP}/ota" ]] && rm -rf "${ANDROID_BUILD_TOP}/ota"
     git clone git@github.com:los-byben/ota.git "${ANDROID_BUILD_TOP}/ota"
@@ -73,6 +79,7 @@ release() {
 
     if [ -z "$tag_name" ]; then
         echo -e "\e[31m[ERROR]\e[0m Failed to extract tag_name (date) from filename: ${filename}"
+        telegram "[ERROR] Failed to extract tag_name (date) from filename: ${filename}"
         exit 1
     fi
 
@@ -94,6 +101,7 @@ release() {
 
     if [ -z "${os_sdk_level}" ]; then
         echo -e "\e[31m[ERROR]\e[0m Failed to read post-sdk-level from ${filename} metadata."
+        telegram "[ERROR] Failed to read post-sdk-level from ${filename} metadata."
         exit 1
     fi
 
@@ -149,11 +157,14 @@ release() {
 
         if [[ -n "${pr_url}" ]]; then
             echo -e "\e[32m[INFO]\e[0m PR created for ${device_variant}: $pr_url"
+            telegram "[INFO] PR created for ${device_variant}: $pr_url"
         else
             echo -e "\e[31m[ERROR]\e[0m Failed to retrieve PR URL. PR creation may have failed."
+            telegram "[ERROR] Failed to retrieve PR URL. PR creation may have failed."
         fi
     else
         echo -e "\e[31m[ERROR]\e[0m No commits found in ${pr_branch}. Aborting PR creation."
+        telegram "[ERROR] No commits found in ${pr_branch}. Aborting PR creation."
         exit 1
     fi
 
@@ -218,4 +229,5 @@ release() {
     done <<< "${images}"
 
     echo -e "\e[32m[INFO]\e[0m Release created successfully!"
+    telegram "[INFO] Release created successfully for ${device_variant}."
 }
