@@ -1,3 +1,15 @@
+enable_gms() {
+    if [[ "${1:-true}" == "true" && -f vendor/pixel/gms/products/gms.mk ]]; then
+        export WITH_GMS=true
+        export TARGET_UNOFFICIAL_BUILD_ID=gms
+        echo -e "\e[32m[INFO]\e[0m Enabling GMS build."
+    else
+        export WITH_GMS=false
+        unset TARGET_UNOFFICIAL_BUILD_ID
+        echo -e "\e[33m[WARN]\e[0m Building vanilla."
+    fi
+}
+
 telegram() {
     local message="$1"
     ~/telegram.sh/telegram "$message"
