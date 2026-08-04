@@ -1,0 +1,41 @@
+From 5bbfedb38df4cde5efbf8641f77c99f078d5a10b Mon Sep 17 00:00:00 2001
+From: WilliamSado <williamsado1004@gmail.com>
+Date: Thu, 23 Jul 2026 01:11:02 +0800
+Subject: [PATCH 2/3] Settings: Use the custom model in About phone
+
+Change-Id: I0863a862129a7af537d9a2f1ef605f3520d4b4e3
+---
+ .../aboutphone/AboutPhoneHeaderController.java         | 10 +++++++++-
+ 1 file changed, 9 insertions(+), 1 deletion(-)
+
+diff --git a/src/com/android/settings/deviceinfo/aboutphone/AboutPhoneHeaderController.java b/src/com/android/settings/deviceinfo/aboutphone/AboutPhoneHeaderController.java
+index 46c6c1c..2e4eafe 100644
+--- a/src/com/android/settings/deviceinfo/aboutphone/AboutPhoneHeaderController.java
++++ b/src/com/android/settings/deviceinfo/aboutphone/AboutPhoneHeaderController.java
+@@ -205,7 +205,7 @@ public class AboutPhoneHeaderController extends BasePreferenceController
+         ((TextView) mLayoutPreference.findViewById(R.id.buildNumberValue)).setText(
+                 getBuildNumberSummary());
+         ((TextView) mLayoutPreference.findViewById(R.id.deviceValue)).setText(
+-                HardwareInfoPreferenceController.getDeviceModel());
++                getCustomModelSummary());
+         ((TextView) mLayoutPreference.findViewById(R.id.cpuValue)).setText(getCpuSummary());
+         ((TextView) mLayoutPreference.findViewById(R.id.ramValue)).setText(getRamSummary());
+         ((TextView) mLayoutPreference.findViewById(R.id.resolutionValue)).setText(
+@@ -399,6 +399,14 @@ public class AboutPhoneHeaderController extends BasePreferenceController
+         return buildId.isEmpty() ? mContext.getString(R.string.unknown) : buildId;
+     }
+ 
++    @NonNull
++    private String getCustomModelSummary() {
++        final String customModel = safeTrim(
++                SystemProperties.get("ro.lineage.custom_model", "")).replace('_', ' ');
++        return customModel.isEmpty()
++                ? HardwareInfoPreferenceController.getDeviceModel() : customModel;
++    }
++
+     @NonNull
+     private String getMaintainerSummary() {
+         final String maintainer = safeTrim(SystemProperties.get("org.uwuaosp.version", ""));
+-- 
+2.54.0
+
