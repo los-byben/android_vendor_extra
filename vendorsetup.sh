@@ -68,7 +68,7 @@ _release_common() {
     telegram "[INFO] Starting release for device: ${device} (${type} variant)"
 
     [[ -d "${ANDROID_BUILD_TOP}/ota" ]] && rm -rf "${ANDROID_BUILD_TOP}/ota"
-    git clone git@github.com:los-byben/ota.git "${ANDROID_BUILD_TOP}/ota"
+    git clone https://github.com/los-byben/ota "${ANDROID_BUILD_TOP}/ota"
     cd "${ANDROID_BUILD_TOP}/ota"
     git pull origin "${pr_branch}"
 
