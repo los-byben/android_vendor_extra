@@ -15,6 +15,26 @@ telegram() {
     ~/telegram.sh/telegram "$message"
 }
 
+sign() {
+    keys_path="${ANDROID_BUILD_TOP}/vendor/lineage-priv/keys"
+
+    if [[ -d "${keys_path}/.git" ]]; then
+        echo -e "\e[33m[WARN]\e[0m Signing keys already present at ${keys_path}. Skipping clone."
+        return 0
+    fi
+
+    echo -e "\e[32m[INFO]\e[0m Cloning signing keys into ${keys_path}"
+    mkdir -p "$(dirname "${keys_path}")"
+    git clone https://github.com/heybyben/android_vendor_lineage-priv_keys "${keys_path}"
+
+    if [[ $? -ne 0 ]]; then
+        echo -e "\e[31m[ERROR]\e[0m Failed to clone signing keys."
+        return 1
+    fi
+
+    echo -e "\e[32m[INFO]\e[0m Signing keys ready at ${keys_path}"
+}
+
 apply_patches() {
     cd ${ANDROID_BUILD_TOP}
     PATCHES_PATH=$PWD/vendor/extra/patches
