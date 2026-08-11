@@ -1,0 +1,54 @@
+From c43869ca2541c52bd29348a3cdd8d2c48484e1bb Mon Sep 17 00:00:00 2001
+From: Abhay Singh Gill <abhaygill017@gmail.com>
+Date: Tue, 16 Sep 2025 15:06:21 +0530
+Subject: [PATCH 14/14] PropImitationHooks: Block key attestation for play
+ integrity
+
+Change-Id: I3d9f9e04fc08c5b212309263aae55296bb98920f
+Signed-off-by: Abhay Singh Gill <abhaygill017@gmail.com>
+---
+ .../android/internal/util/PropImitationHooks.java  | 14 ++++++++------
+ 1 file changed, 8 insertions(+), 6 deletions(-)
+
+diff --git a/core/java/com/android/internal/util/PropImitationHooks.java b/core/java/com/android/internal/util/PropImitationHooks.java
+index 0f2a9bab96da..901392220410 100644
+--- a/core/java/com/android/internal/util/PropImitationHooks.java
++++ b/core/java/com/android/internal/util/PropImitationHooks.java
+@@ -48,6 +48,7 @@ import java.util.ArrayList;
+ import java.util.Arrays;
+ import java.util.Iterator;
+ import java.util.List;
++import java.util.Locale;
+ import java.util.Map;
+ import java.util.Set;
+ 
+@@ -310,9 +311,10 @@ public class PropImitationHooks {
+         return gmsUid == callingUid;
+     }
+ 
+-    private static boolean isCallerSafetyNet() {
+-        return sIsGms && Arrays.stream(Thread.currentThread().getStackTrace())
+-                .anyMatch(elem -> elem.getClassName().contains("DroidGuard"));
++    private static boolean isCallerPlayIntegrity() {
++        return Arrays.stream(Thread.currentThread().getStackTrace())
++                .map(StackTraceElement::getClassName)
++                .anyMatch(name -> name.toLowerCase(Locale.US).contains("droidguard"));
+     }
+ 
+     public static void onEngineGetCertificateChain() {
+@@ -327,9 +329,9 @@ public class PropImitationHooks {
+             return;
+         }
+ 
+-        // Check stack for SafetyNet or Play Integrity
+-        if (isCallerSafetyNet() || sIsFinsky) {
+-            dlog("Blocked key attestation sIsGms=" + sIsGms + " sIsFinsky=" + sIsFinsky);
++        // Check stack for Play Integrity
++        if (isCallerPlayIntegrity()) {
++            dlog("Blocked key attestation for play integrity");
+             throw new UnsupportedOperationException();
+         }
+     }
+-- 
+2.43.0
+

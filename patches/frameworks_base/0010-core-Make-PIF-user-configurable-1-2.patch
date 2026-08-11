@@ -1,0 +1,207 @@
+From ba7463636ec04f551c6d2447c5bf55b5dc7750af Mon Sep 17 00:00:00 2001
+From: Abhay Singh Gill <abhaygill017@gmail.com>
+Date: Sun, 19 Oct 2025 22:05:26 +0545
+Subject: [PATCH 10/14] core: Make PIF user configurable [1/2]
+
+Separated out from [1].
+
+[1]: https://github.com/Neoteric-OS/android_frameworks_base/commit/1fefdf1ea4d74bbe2ff427a499321c5b0959a6cd
+
+Change-Id: Ie86218a5034ff5c6fa9ec3e00a925ffd750686c9
+---
+ core/java/android/provider/Settings.java      | 14 ++++++++
+ .../internal/util/PropImitationHooks.java     | 26 ++++++++------
+ .../validators/SecureSettingsValidators.java  |  2 ++
+ .../server/custom/AttestationService.java     | 34 ++-----------------
+ 4 files changed, 34 insertions(+), 42 deletions(-)
+
+diff --git a/core/java/android/provider/Settings.java b/core/java/android/provider/Settings.java
+index 10179e9f5f23..a7faf797d507 100644
+--- a/core/java/android/provider/Settings.java
++++ b/core/java/android/provider/Settings.java
+@@ -13334,6 +13334,20 @@ public final class Settings {
+         public static final String HBM_SETTING_KEY =
+                 "com.android.server.display.HBM_SETTING_KEY";
+ 
++        /**
++         * User selectable PIF data.
++         * @hide
++         */
++        @Readable
++        public static final String PIF_DATA = "pif_data";
++
++        /**
++         * PIF data fetched from our repo.
++         * @hide
++         */
++        @Readable
++        public static final String FETCHED_PIF = "fetched_pif";
++
+         /**
+          * User selectable keybox data.
+          * @hide
+diff --git a/core/java/com/android/internal/util/PropImitationHooks.java b/core/java/com/android/internal/util/PropImitationHooks.java
+index 0752622a3590..b6ef42090734 100644
+--- a/core/java/com/android/internal/util/PropImitationHooks.java
++++ b/core/java/com/android/internal/util/PropImitationHooks.java
+@@ -29,6 +29,7 @@ import android.os.Binder;
+ import android.os.Environment;
+ import android.os.Process;
+ import android.os.SystemProperties;
++import android.provider.Settings;
+ import android.text.TextUtils;
+ import android.util.Log;
+ 
+@@ -183,23 +184,19 @@ public class PropImitationHooks {
+             return;
+         }
+ 
+-        if (sCertifiedProps.length == 0) {
+-            dlog("Certified props are not set");
+-            return;
++        String savedProps = Settings.Secure.getString(context.getContentResolver(), Settings.Secure.PIF_DATA);
++        if (savedProps == null || TextUtils.isEmpty(savedProps)) {
++            savedProps = Settings.Secure.getString(context.getContentResolver(), Settings.Secure.FETCHED_PIF);
+         }
+ 
+-        File dataFile = new File(Environment.getDataSystemDirectory(), DATA_FILE);
+-        String savedProps = readFromFile(dataFile);
+-
+-        if (TextUtils.isEmpty(savedProps)) {
+-            Log.d(TAG, "Parsing props locally - data file unavailable");
++        if (savedProps == null || TextUtils.isEmpty(savedProps)) {
++            dlog("Parsing props locally - fetched pif / user provided pif unavailable");
+             sCertifiedProps = Arrays.asList(context.getResources().getStringArray(R.array.config_certifiedBuildProperties));
+         } else {
+-            Log.d(TAG, "Parsing props fetched by attestation service");
++            dlog("Parsing props fetched / provided by user");
+             try {
+                 JSONObject parsedProps = new JSONObject(savedProps);
+                 Iterator<String> keys = parsedProps.keys();
+-
+                 while (keys.hasNext()) {
+                     String key = keys.next();
+                     String value = parsedProps.getString(key);
+@@ -207,11 +204,16 @@ public class PropImitationHooks {
+                 }
+             } catch (JSONException e) {
+                 Log.e(TAG, "Error parsing JSON data", e);
+-                Log.d(TAG, "Parsing props locally as fallback");
++                dlog("Parsing props locally as fallback");
+                 sCertifiedProps = Arrays.asList(context.getResources().getStringArray(R.array.config_certifiedBuildProperties));
+             }
+         }
+ 
++        if (sCertifiedProps.isEmpty()) {
++            dlog("Certified props are not set");
++            return;
++        }
++
+         final boolean was = isGmsAddAccountActivityOnTop();
+         final TaskStackListener taskStackListener = new TaskStackListener() {
+             @Override
+@@ -224,12 +226,14 @@ public class PropImitationHooks {
+                 }
+             }
+         };
++
+         if (!was) {
+             dlog("Spoofing build for GMS");
+             setCertifiedProps();
+         } else {
+             dlog("Skip spoofing build for GMS, because GmsAddAccountActivityOnTop");
+         }
++
+         try {
+             ActivityTaskManager.getService().registerTaskStackListener(taskStackListener);
+         } catch (Exception e) {
+diff --git a/packages/SettingsProvider/src/android/provider/settings/validators/SecureSettingsValidators.java b/packages/SettingsProvider/src/android/provider/settings/validators/SecureSettingsValidators.java
+index 2e14ca580c58..5f3145c8b228 100644
+--- a/packages/SettingsProvider/src/android/provider/settings/validators/SecureSettingsValidators.java
++++ b/packages/SettingsProvider/src/android/provider/settings/validators/SecureSettingsValidators.java
+@@ -522,5 +522,7 @@ public class SecureSettingsValidators {
+         VALIDATORS.put(Secure.IDENTITY_CHECK_NOTIFICATION_VIEW_DETAILS_CLICKED,
+                 new InclusiveIntegerRangeValidator(0, 1));
+         VALIDATORS.put(Secure.KEYBOX_DATA, ANY_STRING_VALIDATOR);
++        VALIDATORS.put(Secure.PIF_DATA, ANY_STRING_VALIDATOR);
++        VALIDATORS.put(Secure.FETCHED_PIF, ANY_STRING_VALIDATOR);
+     }
+ }
+diff --git a/services/core/java/com/android/server/custom/AttestationService.java b/services/core/java/com/android/server/custom/AttestationService.java
+index 886629209db7..c30210712611 100644
+--- a/services/core/java/com/android/server/custom/AttestationService.java
++++ b/services/core/java/com/android/server/custom/AttestationService.java
+@@ -14,6 +14,7 @@ import android.net.Network;
+ import android.net.NetworkCapabilities;
+ import android.os.Environment;
+ import android.os.SystemProperties;
++import android.provider.Settings;
+ import android.util.Log;
+ 
+ import com.android.server.SystemService;
+@@ -47,13 +48,11 @@ public final class AttestationService extends SystemService {
+             "persist.sys.pihooks.disable.gms_props", false);
+ 
+     private final Context mContext;
+-    private final File mDataFile;
+     private final ScheduledExecutorService mScheduler;
+ 
+     public AttestationService(Context context) {
+         super(context);
+         mContext = context;
+-        mDataFile = new File(Environment.getDataSystemDirectory(), DATA_FILE);
+         mScheduler = Executors.newSingleThreadScheduledExecutor();
+     }
+ 
+@@ -71,33 +70,6 @@ public final class AttestationService extends SystemService {
+         }
+     }
+ 
+-    private String readFromFile(File file) {
+-        StringBuilder content = new StringBuilder();
+-
+-        if (file.exists()) {
+-            try (BufferedReader reader = new BufferedReader(new FileReader(file))) {
+-                String line;
+-
+-                while ((line = reader.readLine()) != null) {
+-                    content.append(line);
+-                }
+-            } catch (IOException e) {
+-                Log.e(TAG, "Error reading from file", e);
+-            }
+-        }
+-        return content.toString();
+-    }
+-
+-    private void writeToFile(File file, String data) {
+-        try (FileWriter writer = new FileWriter(file)) {
+-            writer.write(data);
+-            // Set -rw-r--r-- (644) permission to make it readable by others.
+-            file.setReadable(true, false);
+-        } catch (IOException e) {
+-            Log.e(TAG, "Error writing to file", e);
+-        }
+-    }
+-
+     private String fetchProps() {
+         try {
+             URL url = new URI(API).toURL();
+@@ -155,12 +127,12 @@ public final class AttestationService extends SystemService {
+                     return;
+                 }
+ 
+-                String savedProps = readFromFile(mDataFile);
++                String savedProps = Settings.Secure.getString(mContext.getContentResolver(), Settings.Secure.FETCHED_PIF);
+                 String props = fetchProps();
+ 
+                 if (props != null && !savedProps.equals(props)) {
+                     dlog("Found new props");
+-                    writeToFile(mDataFile, props);
++                    Settings.Secure.putString(mContext.getContentResolver(), Settings.Secure.FETCHED_PIF, props);
+                     dlog("FetchGmsCertifiedProps completed");
+                 } else {
+                     dlog("No change in props");
+-- 
+2.43.0
+

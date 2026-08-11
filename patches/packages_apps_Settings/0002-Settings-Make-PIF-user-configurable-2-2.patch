@@ -1,0 +1,241 @@
+From 9f5c830b451d5aecf28cb73246a68ebb43f429ff Mon Sep 17 00:00:00 2001
+From: Abhay Singh Gill <abhaygill017@gmail.com>
+Date: Tue, 22 Jul 2025 18:56:55 +0530
+Subject: [PATCH 2/4] Settings:  Make PIF user configurable [2/2]
+
+[hridaya: Update commit message]
+
+Change-Id: Ia95121247279a9e3903fb6c4a75a2fc6bd5af10d
+Signed-off-by: Abhay Singh Gill <abhaygill017@gmail.com>
+---
+ ...box_data_pref.xml => pref_with_delete.xml} |   0
+ res/values/strings.xml                        |   4 +
+ res/xml/apps.xml                              |   6 +
+ .../applications/AppDashboardFragment.java    |  22 ++++
+ .../applications/KeyboxDataPreference.java    |   2 +-
+ .../applications/PifDataPreference.java       | 113 ++++++++++++++++++
+ 6 files changed, 146 insertions(+), 1 deletion(-)
+ rename res/layout/{keybox_data_pref.xml => pref_with_delete.xml} (100%)
+ create mode 100644 src/com/android/settings/applications/PifDataPreference.java
+
+diff --git a/res/layout/keybox_data_pref.xml b/res/layout/pref_with_delete.xml
+similarity index 100%
+rename from res/layout/keybox_data_pref.xml
+rename to res/layout/pref_with_delete.xml
+diff --git a/res/values/strings.xml b/res/values/strings.xml
+index ba0a55da338..b12ac73ffa7 100644
+--- a/res/values/strings.xml
++++ b/res/values/strings.xml
+@@ -14953,4 +14953,8 @@
+     <!-- Keybox Data -->
+     <string name="keybox_data_title">Select keybox XML to spoof</string>
+     <string name="keybox_data_summary">Select keybox XML used for key attestation spoofing for all apps system wide. Click the delete button in order to reset the keybox data values used by the system.</string>
++
++    <!-- Pif Data -->
++    <string name="pif_data_title">Select PIF JSON to spoof</string>
++    <string name="pif_data_summary">Select PIF JSON used for prop attestation spoofing for google mobile services. Click the delete button in order to reset the PIF data props and use dynamic PIF props which are used by default.</string>
+ </resources>
+diff --git a/res/xml/apps.xml b/res/xml/apps.xml
+index e8843c6cee2..ff69059b6bc 100644
+--- a/res/xml/apps.xml
++++ b/res/xml/apps.xml
+@@ -121,6 +121,12 @@
+         android:summary="@string/keybox_data_summary"
+         android:defaultValue=""/>
+ 
++    <com.android.settings.applications.PifDataPreference
++        android:key="pif_data_setting"
++        android:title="@string/pif_data_title"
++        android:summary="@string/pif_data_summary"
++        android:defaultValue=""/>
++
+     <PreferenceCategory
+         android:key="advanced_category"
+         android:title="@string/advanced_apps"
+diff --git a/src/com/android/settings/applications/AppDashboardFragment.java b/src/com/android/settings/applications/AppDashboardFragment.java
+index 3b03157c455..74b2f31fd97 100644
+--- a/src/com/android/settings/applications/AppDashboardFragment.java
++++ b/src/com/android/settings/applications/AppDashboardFragment.java
+@@ -54,8 +54,11 @@ public class AppDashboardFragment extends DashboardFragment {
+     private static final String ADVANCED_CATEGORY_KEY = "advanced_category";
+     private static final String ASPECT_RATIO_PREF_KEY = "aspect_ratio_apps";
+     private static final String KEYBOX_DATA_KEY = "keybox_data_setting";
++    private static final String PIF_DATA_KEY = "pif_data_setting";
+     private ActivityResultLauncher<Intent> mKeyboxFilePickerLauncher;
++    private ActivityResultLauncher<Intent> mPifFilePickerLauncher;
+     private KeyboxDataPreference mKeyboxDataPreference;
++    private PifDataPreference mPifDataPreference;
+     private AppsPreferenceController mAppsPreferenceController;
+ 
+     private static List<AbstractPreferenceController> buildPreferenceControllers(Context context) {
+@@ -119,6 +122,19 @@ public class AppDashboardFragment extends DashboardFragment {
+                 }
+             }
+         );
++
++        mPifFilePickerLauncher = registerForActivityResult(
++            new ActivityResultContracts.StartActivityForResult(),
++            result -> {
++                if (result.getResultCode() == Activity.RESULT_OK && result.getData() != null) {
++                    Uri uri = result.getData().getData();
++                    Preference pref = findPreference(PIF_DATA_KEY);
++                    if (pref instanceof PifDataPreference) {
++                        ((PifDataPreference) pref).handleFileSelected(uri);
++                    }
++                }
++            }
++        );
+     }
+ 
+     @Override
+@@ -126,9 +142,15 @@ public class AppDashboardFragment extends DashboardFragment {
+         super.onViewCreated(view, savedInstanceState);
+ 
+         mKeyboxDataPreference = findPreference(KEYBOX_DATA_KEY);
++        mPifDataPreference = findPreference(PIF_DATA_KEY);
++
+         if (mKeyboxDataPreference != null) {
+             mKeyboxDataPreference.setFilePickerLauncher(mKeyboxFilePickerLauncher);
+         }
++
++        if (mPifDataPreference != null) {
++            mPifDataPreference.setFilePickerLauncher(mPifFilePickerLauncher);
++        }
+     }
+ 
+     @VisibleForTesting
+diff --git a/src/com/android/settings/applications/KeyboxDataPreference.java b/src/com/android/settings/applications/KeyboxDataPreference.java
+index a93156c03ec..503b2949e4d 100644
+--- a/src/com/android/settings/applications/KeyboxDataPreference.java
++++ b/src/com/android/settings/applications/KeyboxDataPreference.java
+@@ -32,7 +32,7 @@ public class KeyboxDataPreference extends Preference {
+ 
+     public KeyboxDataPreference(Context context, AttributeSet attrs) {
+         super(context, attrs);
+-        setLayoutResource(R.layout.keybox_data_pref);
++        setLayoutResource(R.layout.pref_with_delete);
+     }
+ 
+     public void setFilePickerLauncher(ActivityResultLauncher<Intent> launcher) {
+diff --git a/src/com/android/settings/applications/PifDataPreference.java b/src/com/android/settings/applications/PifDataPreference.java
+new file mode 100644
+index 00000000000..a6b1d3fbe3a
+--- /dev/null
++++ b/src/com/android/settings/applications/PifDataPreference.java
+@@ -0,0 +1,113 @@
++package com.android.settings.applications;
++
++import android.app.ActivityManager;
++import android.content.Context;
++import android.content.Intent;
++import android.net.Uri;
++import android.provider.Settings;
++import android.util.AttributeSet;
++import android.util.Log;
++import android.widget.ImageButton;
++import android.widget.TextView;
++import android.widget.Toast;
++
++import androidx.activity.result.ActivityResultLauncher;
++import androidx.preference.Preference;
++import androidx.preference.PreferenceViewHolder;
++
++import com.android.settings.R;
++
++import java.io.BufferedReader;
++import java.io.IOException;
++import java.io.InputStream;
++import java.io.InputStreamReader;
++import java.io.StringReader;
++
++public class PifDataPreference extends Preference {
++
++    private static final String TAG = "PifDataPref";
++    private ActivityResultLauncher<Intent> mFilePickerLauncher;
++
++    public PifDataPreference(Context context, AttributeSet attrs) {
++        super(context, attrs);
++        setLayoutResource(R.layout.pref_with_delete);
++    }
++
++    public void setFilePickerLauncher(ActivityResultLauncher<Intent> launcher) {
++        this.mFilePickerLauncher = launcher;
++    }
++
++    @Override
++    public void onBindViewHolder(PreferenceViewHolder holder) {
++        super.onBindViewHolder(holder);
++
++        TextView title = (TextView) holder.findViewById(R.id.title);
++        TextView summary = (TextView) holder.findViewById(R.id.summary);
++        ImageButton deleteButton = (ImageButton) holder.findViewById(R.id.delete_button);
++
++        title.setText(getTitle());
++        summary.setText(getSummary());
++
++        holder.itemView.setOnClickListener(v -> {
++            if (mFilePickerLauncher != null) {
++                Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
++                intent.setType("application/json");
++                intent.addCategory(Intent.CATEGORY_OPENABLE);
++                mFilePickerLauncher.launch(intent);
++            }
++        });
++
++        deleteButton.setOnClickListener(v -> {
++            Settings.Secure.putString(getContext().getContentResolver(),
++                    Settings.Secure.PIF_DATA, null);
++            Toast.makeText(getContext(), "User PIF data cleared", Toast.LENGTH_SHORT).show();
++            callChangeListener(null);
++
++            killGms();
++        });
++    }
++
++    public void handleFileSelected(Uri uri) {
++        if (uri == null ||
++            (!uri.toString().endsWith(".json") &&
++             !"application/json".equals(getContext().getContentResolver().getType(uri)))) {
++            Toast.makeText(getContext(), "Invalid file selected", Toast.LENGTH_SHORT).show();
++            return;
++        }
++
++        try (InputStream inputStream = getContext().getContentResolver().openInputStream(uri);
++             BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream))) {
++
++            StringBuilder jsonContent = new StringBuilder();
++            String line;
++            while ((line = reader.readLine()) != null) {
++                jsonContent.append(line).append('\n');
++            }
++
++            String json = jsonContent.toString();
++
++            Settings.Secure.putString(getContext().getContentResolver(),
++                    Settings.Secure.PIF_DATA, json);
++            Toast.makeText(getContext(), "JSON file loaded", Toast.LENGTH_SHORT).show();
++            callChangeListener(json);
++
++            killGms();
++        } catch (IOException e) {
++            Log.e(TAG, "Failed to read JSON file", e);
++            Toast.makeText(getContext(), "Failed to read JSON", Toast.LENGTH_SHORT).show();
++        }
++    }
++
++    private void killGms() {
++        try {
++            ActivityManager am = (ActivityManager)
++                    getContext().getSystemService(Context.ACTIVITY_SERVICE);
++            am.getClass()
++              .getMethod("forceStopPackage", String.class)
++              .invoke(am, "com.google.android.gms");
++            Log.i(TAG, "GMS process killed");
++        } catch (Exception e) {
++            Log.e(TAG, "Failed to kill GMS process", e);
++        }
++    }
++}
+-- 
+2.43.0
+

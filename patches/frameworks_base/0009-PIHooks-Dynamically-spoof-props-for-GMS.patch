@@ -1,0 +1,389 @@
+From b4aa79ad199c96be693aad13372c18e03a5625b2 Mon Sep 17 00:00:00 2001
+From: SamarV-121 <samar@samarv121.dev>
+Date: Mon, 27 Jan 2025 20:12:38 +0800
+Subject: [PATCH 09/14] PIHooks: Dynamically spoof props for GMS
+
+neobuddy89: Adapted for PixelPropsUtils. Use local props as fallback.
+
+[clarencelol: Adapt changes from CrDroid.]
+
+Change-Id: I3a7266947e9b7eee9738807448a2f2babaf819e9
+Signed-off-by: Pranav Vashi <neobuddy89@gmail.com>
+Signed-off-by: clarencelol <clarencekuiek@proton.me>
+---
+ .../internal/util/PropImitationHooks.java     |  60 +++++-
+ .../internal/util/custom/CustomUtils.java     |  27 +++
+ .../server/custom/AttestationService.java     | 173 ++++++++++++++++++
+ .../java/com/android/server/SystemServer.java |   6 +
+ 4 files changed, 262 insertions(+), 4 deletions(-)
+ create mode 100644 core/java/com/android/internal/util/custom/CustomUtils.java
+ create mode 100644 services/core/java/com/android/server/custom/AttestationService.java
+
+diff --git a/core/java/com/android/internal/util/PropImitationHooks.java b/core/java/com/android/internal/util/PropImitationHooks.java
+index 045d8d68fc76..0752622a3590 100644
+--- a/core/java/com/android/internal/util/PropImitationHooks.java
++++ b/core/java/com/android/internal/util/PropImitationHooks.java
+@@ -26,6 +26,7 @@ import android.content.Context;
+ import android.content.res.Resources;
+ import android.os.Build;
+ import android.os.Binder;
++import android.os.Environment;
+ import android.os.Process;
+ import android.os.SystemProperties;
+ import android.text.TextUtils;
+@@ -34,8 +35,18 @@ import android.util.Log;
+ import com.android.internal.R;
+ import com.android.internal.util.custom.KeyProviderManager;
+ 
++import org.json.JSONException;
++import org.json.JSONObject;
++
++import java.io.BufferedReader;
++import java.io.File;
++import java.io.FileReader;
++import java.io.IOException;
+ import java.lang.reflect.Field;
++import java.util.ArrayList;
+ import java.util.Arrays;
++import java.util.Iterator;
++import java.util.List;
+ import java.util.Map;
+ import java.util.Set;
+ 
+@@ -52,6 +63,7 @@ public class PropImitationHooks {
+ 
+     private static final Boolean sDisableKeyAttestationBlock = SystemProperties.getBoolean(
+             "persist.sys.pihooks.disable.gms_key_attestation_block", false);
++    private static final String DATA_FILE = "gms_certified_props.json";
+ 
+     private static final String PACKAGE_ARCORE = "com.google.ar.core";
+     private static final String PACKAGE_FINSKY = "com.android.vending";
+@@ -99,7 +111,7 @@ public class PropImitationHooks {
+         "PIXEL_2024_MIDYEAR_EXPERIENCE"
+     );
+ 
+-    private static volatile String[] sCertifiedProps;
++    private static volatile List<String> sCertifiedProps = new ArrayList<>();
+     private static volatile String sStockFp, sNetflixModel;
+ 
+     private static volatile String sProcessName;
+@@ -120,7 +132,6 @@ public class PropImitationHooks {
+             return;
+         }
+ 
+-        sCertifiedProps = res.getStringArray(R.array.config_certifiedBuildProperties);
+         sStockFp = res.getString(R.string.config_stockFingerprint);
+         sNetflixModel = res.getString(R.string.config_netflixSpoofModel);
+ 
+@@ -135,7 +146,7 @@ public class PropImitationHooks {
+          * Set Pixel XL for Google Photos
+          */
+         if (sIsGms) {
+-            setCertifiedPropsForGms();
++            setCertifiedPropsForGms(context);
+         } else if (!sStockFp.isEmpty() && packageName.equals(PACKAGE_ARCORE)) {
+             dlog("Setting stock fingerprint for: " + packageName);
+             setPropValue("FINGERPRINT", sStockFp);
+@@ -166,7 +177,7 @@ public class PropImitationHooks {
+         }
+     }
+ 
+-    private static void setCertifiedPropsForGms() {
++    private static void setCertifiedPropsForGms(Context context) {
+         if (sDisableGmsProps) {
+             dlog("GMS prop imitation is disabled by user");
+             return;
+@@ -177,6 +188,30 @@ public class PropImitationHooks {
+             return;
+         }
+ 
++        File dataFile = new File(Environment.getDataSystemDirectory(), DATA_FILE);
++        String savedProps = readFromFile(dataFile);
++
++        if (TextUtils.isEmpty(savedProps)) {
++            Log.d(TAG, "Parsing props locally - data file unavailable");
++            sCertifiedProps = Arrays.asList(context.getResources().getStringArray(R.array.config_certifiedBuildProperties));
++        } else {
++            Log.d(TAG, "Parsing props fetched by attestation service");
++            try {
++                JSONObject parsedProps = new JSONObject(savedProps);
++                Iterator<String> keys = parsedProps.keys();
++
++                while (keys.hasNext()) {
++                    String key = keys.next();
++                    String value = parsedProps.getString(key);
++                    sCertifiedProps.add(key + ":" + value);
++                }
++            } catch (JSONException e) {
++                Log.e(TAG, "Error parsing JSON data", e);
++                Log.d(TAG, "Parsing props locally as fallback");
++                sCertifiedProps = Arrays.asList(context.getResources().getStringArray(R.array.config_certifiedBuildProperties));
++            }
++        }
++
+         final boolean was = isGmsAddAccountActivityOnTop();
+         final TaskStackListener taskStackListener = new TaskStackListener() {
+             @Override
+@@ -214,6 +249,23 @@ public class PropImitationHooks {
+         }
+     }
+ 
++    private static String readFromFile(File file) {
++        StringBuilder content = new StringBuilder();
++
++        if (file.exists()) {
++            try (BufferedReader reader = new BufferedReader(new FileReader(file))) {
++                String line;
++
++                while ((line = reader.readLine()) != null) {
++                    content.append(line);
++                }
++            } catch (IOException e) {
++                Log.e(TAG, "Error reading from file", e);
++            }
++        }
++        return content.toString();
++    }
++
+     private static boolean isGmsAddAccountActivityOnTop() {
+         try {
+             final ActivityTaskManager.RootTaskInfo focusedTask =
+diff --git a/core/java/com/android/internal/util/custom/CustomUtils.java b/core/java/com/android/internal/util/custom/CustomUtils.java
+new file mode 100644
+index 000000000000..5e28ebf6b87f
+--- /dev/null
++++ b/core/java/com/android/internal/util/custom/CustomUtils.java
+@@ -0,0 +1,27 @@
++package com.android.internal.util.custom;
++
++import android.content.Context;
++import android.content.pm.ApplicationInfo;
++import android.content.pm.PackageInfo;
++import android.content.pm.PackageManager;
++
++public class CustomUtils {
++
++    public static boolean isPackageInstalled(Context context, String packageName, boolean ignoreState) {
++        if (packageName != null) {
++            try {
++                PackageInfo pi = context.getPackageManager().getPackageInfo(packageName, 0);
++                if (!pi.applicationInfo.enabled && !ignoreState) {
++                    return false;
++                }
++            } catch (PackageManager.NameNotFoundException e) {
++                return false;
++            }
++        }
++        return true;
++    }
++
++    public static boolean isPackageInstalled(Context context, String packageName) {
++        return isPackageInstalled(context, packageName, true);
++    }
++}
+diff --git a/services/core/java/com/android/server/custom/AttestationService.java b/services/core/java/com/android/server/custom/AttestationService.java
+new file mode 100644
+index 000000000000..886629209db7
+--- /dev/null
++++ b/services/core/java/com/android/server/custom/AttestationService.java
+@@ -0,0 +1,173 @@
++/*
++ * Copyright (C) 2024 The LeafOS Project
++ *
++ * SPDX-License-Identifier: Apache-2.0
++ *
++ */
++
++package com.android.server.custom;
++
++import android.content.Context;
++import android.content.pm.PackageManager;
++import android.net.ConnectivityManager;
++import android.net.Network;
++import android.net.NetworkCapabilities;
++import android.os.Environment;
++import android.os.SystemProperties;
++import android.util.Log;
++
++import com.android.server.SystemService;
++import com.android.internal.util.custom.CustomUtils;
++
++import java.io.BufferedReader;
++import java.io.File;
++import java.io.FileReader;
++import java.io.FileWriter;
++import java.io.IOException;
++import java.io.InputStreamReader;
++import java.net.HttpURLConnection;
++import java.net.URI;
++import java.net.URL;
++import java.util.concurrent.Executors;
++import java.util.concurrent.ScheduledExecutorService;
++import java.util.concurrent.TimeUnit;
++
++public final class AttestationService extends SystemService {
++
++    private static final String TAG = AttestationService.class.getSimpleName();
++    private static final String API = "https://raw.githubusercontent.com/PixelOS-AOSP/official_devices/refs/heads/sixteen/API/updater/CertifiedProps/certified_build_props.json";
++
++    private static final String DATA_FILE = "gms_certified_props.json";
++
++    private static final long INITIAL_DELAY = 0;
++    private static final long INTERVAL = 5;
++
++    private static final boolean DEBUG = Log.isLoggable(TAG, Log.DEBUG);
++    private static final Boolean sDisableGmsProps = SystemProperties.getBoolean(
++            "persist.sys.pihooks.disable.gms_props", false);
++
++    private final Context mContext;
++    private final File mDataFile;
++    private final ScheduledExecutorService mScheduler;
++
++    public AttestationService(Context context) {
++        super(context);
++        mContext = context;
++        mDataFile = new File(Environment.getDataSystemDirectory(), DATA_FILE);
++        mScheduler = Executors.newSingleThreadScheduledExecutor();
++    }
++
++    @Override
++    public void onStart() {}
++
++    @Override
++    public void onBootPhase(int phase) {
++        if (!sDisableGmsProps
++                && CustomUtils.isPackageInstalled(mContext, "com.google.android.gms")
++                && phase == PHASE_BOOT_COMPLETED) {
++            Log.i(TAG, "Scheduling the service");
++            mScheduler.scheduleAtFixedRate(
++                    new FetchGmsCertifiedProps(), INITIAL_DELAY, INTERVAL, TimeUnit.MINUTES);
++        }
++    }
++
++    private String readFromFile(File file) {
++        StringBuilder content = new StringBuilder();
++
++        if (file.exists()) {
++            try (BufferedReader reader = new BufferedReader(new FileReader(file))) {
++                String line;
++
++                while ((line = reader.readLine()) != null) {
++                    content.append(line);
++                }
++            } catch (IOException e) {
++                Log.e(TAG, "Error reading from file", e);
++            }
++        }
++        return content.toString();
++    }
++
++    private void writeToFile(File file, String data) {
++        try (FileWriter writer = new FileWriter(file)) {
++            writer.write(data);
++            // Set -rw-r--r-- (644) permission to make it readable by others.
++            file.setReadable(true, false);
++        } catch (IOException e) {
++            Log.e(TAG, "Error writing to file", e);
++        }
++    }
++
++    private String fetchProps() {
++        try {
++            URL url = new URI(API).toURL();
++            HttpURLConnection urlConnection = (HttpURLConnection) url.openConnection();
++
++            try {
++                urlConnection.setConnectTimeout(10000);
++                urlConnection.setReadTimeout(10000);
++
++                try (BufferedReader reader =
++                        new BufferedReader(new InputStreamReader(urlConnection.getInputStream()))) {
++                    StringBuilder response = new StringBuilder();
++                    String line;
++
++                    while ((line = reader.readLine()) != null) {
++                        response.append(line);
++                    }
++
++                    return response.toString();
++                }
++            } finally {
++                urlConnection.disconnect();
++            }
++        } catch (Exception e) {
++            Log.e(TAG, "Error making an API request", e);
++            return null;
++        }
++    }
++
++    private boolean isInternetConnected() {
++        ConnectivityManager cm =
++                (ConnectivityManager) mContext.getSystemService(Context.CONNECTIVITY_SERVICE);
++        Network nw = cm.getActiveNetwork();
++        if (nw == null) return false;
++        NetworkCapabilities actNw = cm.getNetworkCapabilities(nw);
++        return actNw != null
++                && (actNw.hasTransport(NetworkCapabilities.TRANSPORT_WIFI)
++                        || actNw.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR)
++                        || actNw.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET)
++                        || actNw.hasTransport(NetworkCapabilities.TRANSPORT_BLUETOOTH));
++    }
++
++    private void dlog(String message) {
++        if (DEBUG) Log.d(TAG, message);
++    }
++
++    private class FetchGmsCertifiedProps implements Runnable {
++        @Override
++        public void run() {
++            try {
++                dlog("FetchGmsCertifiedProps started");
++
++                if (!isInternetConnected()) {
++                    Log.e(TAG, "Internet unavailable");
++                    return;
++                }
++
++                String savedProps = readFromFile(mDataFile);
++                String props = fetchProps();
++
++                if (props != null && !savedProps.equals(props)) {
++                    dlog("Found new props");
++                    writeToFile(mDataFile, props);
++                    dlog("FetchGmsCertifiedProps completed");
++                } else {
++                    dlog("No change in props");
++                }
++            } catch (Exception e) {
++                Log.e(TAG, "Error in FetchGmsCertifiedProps", e);
++            }
++        }
++    }
++}
+diff --git a/services/java/com/android/server/SystemServer.java b/services/java/com/android/server/SystemServer.java
+index a184d6a7efe8..1988686b6b0f 100644
+--- a/services/java/com/android/server/SystemServer.java
++++ b/services/java/com/android/server/SystemServer.java
+@@ -217,6 +217,7 @@ import com.android.server.pdb.PersistentDataBlockService;
+ import com.android.server.people.PeopleService;
+ import com.android.server.permission.access.AccessCheckingService;
+ import com.android.server.pinner.PinnerService;
++import com.android.server.custom.AttestationService;
+ import com.android.server.pm.ApexManager;
+ import com.android.server.pm.ApexSystemServiceInfo;
+ import com.android.server.pm.BackgroundInstallControlService;
+@@ -2863,6 +2864,11 @@ public final class SystemServer implements Dumpable {
+                 mSystemServiceManager.startService(BackgroundInstallControlService.class);
+                 t.traceEnd();
+             }
++
++            // AttestationService
++            t.traceBegin("AttestationService");
++            mSystemServiceManager.startService(AttestationService.class);
++            t.traceEnd();
+         }
+ 
+         t.traceBegin("StartMediaProjectionManager");
+-- 
+2.43.0
+
