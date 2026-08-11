@@ -1,0 +1,42 @@
+From 109f113f723f91771cf954a598fcdcaa46833759 Mon Sep 17 00:00:00 2001
+From: Omkar Chandorkar <gotenksIN@aosip.dev>
+Date: Thu, 27 May 2021 15:42:25 +0000
+Subject: [PATCH 2/4] init: set build_tags to release-keys
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+• Few special apps also care about this alongside safetynet.
+  For example: Microsoft Teams and some banking apps consider
+               device as rooted and refuse to work.
+• Considering the comment section at [1], this change is done.
+
+Reference:
+[1] - https://gerrit.aospa.co/c/AOSPA/android_build/+/20784
+
+Change-Id: I7d838b03ea3b53806124532c772e5c8a650648da
+---
+ init/property_service.cpp | 3 +--
+ 1 file changed, 1 insertion(+), 2 deletions(-)
+
+diff --git a/init/property_service.cpp b/init/property_service.cpp
+index 1bca60e2d..094ad0489 100644
+--- a/init/property_service.cpp
++++ b/init/property_service.cpp
+@@ -1375,12 +1375,11 @@ static void ProcessBootconfig() {
+ }
+ 
+ static void SetSafetyNetProps() {
+-
+     InitPropertySet("ro.boot.flash.locked", "1");
+     InitPropertySet("ro.boot.vbmeta.device_state", "locked");
+     InitPropertySet("ro.boot.verifiedbootstate", "green");
+     InitPropertySet("ro.boot.veritymode", "enforcing");
+-
++    InitPropertySet("ro.build.tags", "release-keys");
+ }
+ 
+ void PropertyInit() {
+-- 
+2.43.0
+

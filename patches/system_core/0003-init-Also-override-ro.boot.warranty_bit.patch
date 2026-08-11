@@ -1,0 +1,25 @@
+From 1f13bce7b3e0bef26d694072f1e7ba330e135743 Mon Sep 17 00:00:00 2001
+From: Tim Zimmermann <tim@linux4.de>
+Date: Fri, 3 Jun 2022 20:01:38 +0200
+Subject: [PATCH 3/4] init: Also override ro.boot.warranty_bit
+
+Change-Id: Id7c1d4e623f352a57c08625cae08fc330d7ddb27
+---
+ init/property_service.cpp | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/init/property_service.cpp b/init/property_service.cpp
+index 094ad0489..cf9456cbb 100644
+--- a/init/property_service.cpp
++++ b/init/property_service.cpp
+@@ -1379,6 +1379,7 @@ static void SetSafetyNetProps() {
+     InitPropertySet("ro.boot.vbmeta.device_state", "locked");
+     InitPropertySet("ro.boot.verifiedbootstate", "green");
+     InitPropertySet("ro.boot.veritymode", "enforcing");
++    InitPropertySet("ro.boot.warranty_bit", "0");
+     InitPropertySet("ro.build.tags", "release-keys");
+ }
+ 
+-- 
+2.43.0
+
