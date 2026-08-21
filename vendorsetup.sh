@@ -54,7 +54,7 @@ apply_patches() {
 _release_common() {
     device="$1"
     project="$(basename ${ANDROID_BUILD_TOP})"
-    pr_branch="los-23"
+    pr_branch="los-24"
 
     if [[ ${WITH_GMS} == "true" ]]; then
         type="GMS"
@@ -209,7 +209,7 @@ _release_finish() {
         pr_branch="ota-update-$(date +%Y%m%d%H%M%S)"
         git checkout -b "${pr_branch}"
         git push origin "${pr_branch}"
-        pr_url=$(gh pr create --base los-23 --head "${pr_branch}" --title "OTA update for ${device_variant}" --body "This PR contains the OTA update for ${device_variant}." | grep -oP 'https://github.com[^\s]+')
+        pr_url=$(gh pr create --base los-24 --head "${pr_branch}" --title "OTA update for ${device_variant}" --body "This PR contains the OTA update for ${device_variant}." | grep -oP 'https://github.com[^\s]+')
 
         if [[ -n "${pr_url}" ]]; then
             echo -e "\e[32m[INFO]\e[0m PR created for ${device_variant}: $pr_url"
