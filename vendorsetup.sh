@@ -1,3 +1,6 @@
+export BUILD_USERNAME="byben"
+export BUILD_HOSTNAME="wkcw"
+
 enable_gms() {
     if [[ "${1:-false}" == "true" && -f vendor/pixel/gms/products/gms.mk ]]; then
         export WITH_GMS=true
