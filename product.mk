@@ -27,3 +27,7 @@ $(call inherit-product-if-exists, device/xiaomi/$(shell echo -n $(TARGET_PRODUCT
 # Overlay
 PRODUCT_PACKAGES += \
     UpdaterOverlayExtra
+
+# Spoofify
+PRODUCT_PACKAGES += \
+    Spoofify
