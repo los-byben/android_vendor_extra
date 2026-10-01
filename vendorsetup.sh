@@ -48,11 +48,16 @@ FAILED: $1"
 }
 
 watch_build_progress() {
-    local log="$1" last=-1 pct
+    local log="$1" last=-1 pct line
     while sleep 60; do
         [[ -f "${log}" ]] || continue
-        pct=$(grep -oP '\[\s*\K[0-9]+(?=%)' "${log}" | tail -1)
-        [[ -z "${pct}" ]] && continue
+        line=$(tail -100 "${log}" | grep -oP '\[\s*[0-9]+%\s*[0-9]+/[0-9]+\]' | tail -1)
+        [[ -z "${line}" ]] && continue
+        if [[ "${line}" =~ ([0-9]+)%[[:space:]]+[0-9]+/([0-9]+) ]] && (( BASH_REMATCH[2] >= 100 )); then
+            pct=${BASH_REMATCH[1]}
+        else
+            continue
+        fi
         pct=$(( pct / 5 * 5 ))
         if (( pct > last )); then
             last=${pct}
