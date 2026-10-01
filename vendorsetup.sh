@@ -303,26 +303,24 @@ _release_finish() {
     rm -f "${device_variant}.json"
     echo "${ota_entry}" > "${device_variant}.json"
 
+    if ! jq empty "${device_variant}.json"; then
+        echo -e "\e[31m[ERROR]\e[0m Generated OTA JSON is invalid."
+        release_fail "generated OTA JSON is invalid."
+    fi
+
+    for expr in '.[0].datetime' '.[0].version' '.[0].files[0].filename' '.[0].files[0].sha256' '.[0].files[0].size' '.[0].files[0].url'; do
+        if [[ -z "$(jq -r "${expr} // empty" "${device_variant}.json")" ]]; then
+            echo -e "\e[31m[ERROR]\e[0m OTA JSON missing ${expr}."
+            release_fail "OTA JSON missing ${expr}."
+        fi
+    done
+
     git add "${device_variant}.json"
     git commit --no-gpg-sign -m "${device_variant}: OTA update $(date +%F)"
 
-    if [[ $(git rev-list --count HEAD) -gt 0 ]]; then
-        pr_branch="ota-update-$(date +%Y%m%d%H%M%S)"
-        git checkout -b "${pr_branch}"
-        git push origin "${pr_branch}"
-        pr_url=$(gh pr create --base los-24 --head "${pr_branch}" --title "OTA update for ${device_variant}" --body "This PR contains the OTA update for ${device_variant}." | grep -oP 'https://github.com[^\s]+')
-
-        if [[ -n "${pr_url}" ]]; then
-            echo -e "\e[32m[INFO]\e[0m PR created for ${device_variant}: $pr_url"
-            telegram "[INFO] PR created for ${device_variant}: $pr_url"
-        else
-            echo -e "\e[31m[ERROR]\e[0m Failed to retrieve PR URL. PR creation may have failed."
-            telegram "[ERROR] Failed to retrieve PR URL. PR creation may have failed."
-        fi
-    else
-        echo -e "\e[31m[ERROR]\e[0m No commits found in ${pr_branch}. Aborting PR creation."
-        telegram "[ERROR] No commits found in ${pr_branch}. Aborting PR creation."
-        exit 1
+    if ! git push origin los-24; then
+        echo -e "\e[31m[ERROR]\e[0m Failed to push OTA update for ${device_variant}."
+        release_fail "could not push OTA update."
     fi
 
     cd ..
