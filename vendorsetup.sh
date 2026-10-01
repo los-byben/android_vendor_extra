@@ -177,6 +177,8 @@ send_release_notes() {
 
     local tmp_url="${release_url%/download}"
     local sf_dir="${tmp_url%/*}/"
+    local url_suffix=""
+    [[ "${release_url}" == *sourceforge* ]] && url_suffix="/download"
 
     local msg="${title}"
     msg+=$'\n\n'"Date: ${date_fmt}"
@@ -192,7 +194,7 @@ send_release_notes() {
         [[ -f "${image_path}" ]] || continue
         base="$(basename "${image_path}")"
         fsize=$(stat -c%s "${image_path}")
-        furl="${sf_dir}${base}/download"
+        furl="${sf_dir}${base}${url_suffix}"
         msg+=$'\n'"<a href=\"${furl}\">${base}</a> ($(human_size "${fsize}"))"
     done <<< "${images}"
 
@@ -335,63 +337,42 @@ release_vanilla() {
     local device="${1:?Usage: release_vanilla <device>}"
     enable_gms false
     extraimages="bootimage recoveryimage vendorbootimage initbootimage"
-    sf_project_name="wakacaw-project"
+    gh_repo="los-byben/ota"
 
     _release_common "${device}"
 
-    release_url="https://sourceforge.net/projects/${sf_project_name}/files/${device}/lineage/${tag_name}/$(basename ${filename})/download"
+    gh_tag="${device}-${tag_name}"
 
-    {
-        echo "mkdir /home/frs/project/${sf_project_name}/${device}/lineage/"
-        echo "mkdir /home/frs/project/${sf_project_name}/${device}/lineage/${tag_name}/"
-    } | sftp ramaadni@frs.sourceforge.net
+    echo -e "\e[32m[INFO]\e[0m Vanilla build, uploading to GitHub Releases (${gh_repo})"
 
-    echo "[INFO] Uploading vanilla ROM to SourceForge..."
-    rsync -Ph \
-        "${OUT}/${filename}" \
-        "ramaadni@frs.sourceforge.net:/home/frs/project/${sf_project_name}/${device}/lineage/${tag_name}/"
+    gh_assets=("${OUT}/${filename}" "${OUT}/${filename}.sha256sum")
 
-    echo "[INFO] Uploading SHA256..."
-    rsync -Ph \
-        "${OUT}/${filename}.sha256sum" \
-        "ramaadni@frs.sourceforge.net:/home/frs/project/${sf_project_name}/${device}/lineage/${tag_name}/"
-
-    echo "[INFO] Processing extra images (SourceForge):"
+    echo "[INFO] Processing extra images (GitHub Releases):"
     echo "${images}"
 
     while IFS= read -r image; do
         if [[ -v "image_map[${image}]" ]]; then
             image_path="${image_map[${image}]}"
-            if [ -f "${image_path}" ]; then
-                remote_file="$(basename "${image_path}")"
-                remote_path="/home/frs/project/${sf_project_name}/${device}/lineage/${tag_name}/${remote_file}"
-
-                echo "[INFO] Checking ${remote_file} on SourceForge..."
-
-                rsync_output=$(rsync --dry-run -avz \
-                    "ramaadni@frs.sourceforge.net:${remote_path}" 2>&1)
-
-                if echo "${rsync_output}" | grep -q 'No such file or directory'; then
-                    echo "[INFO] ${remote_file} not found. Uploading..."
-                    rsync -Ph \
-                        "${image_path}" \
-                        "ramaadni@frs.sourceforge.net:${remote_path}"
-                else
-                    remote_size=$(echo "${rsync_output}" | grep -oP '(\d+) bytes' | awk '{print $1}')
-
-                    if [ -n "${remote_size}" ]; then
-                        echo "[INFO] ${remote_file} already exists (${remote_size} bytes). Skipping upload."
-                    else
-                        echo "[ERROR] Failed to determine remote size for ${remote_file}."
-                    fi
-                fi
-            else
-                echo "[ERROR] ${image_path} not found in ${OUT}"
-            fi
+            [ -f "${image_path}" ] && gh_assets+=("${image_path}") \
+                || echo "[ERROR] ${image_path} not found in ${OUT}"
         else
-            echo "[ERROR] Unknown extra image: ${image}"
+            echo "[ERROR] Unknown extra image: $image"
         fi
     done <<< "${images}"
+
+    if gh release view "${gh_tag}" --repo "${gh_repo}" &>/dev/null; then
+        echo "[INFO] Release ${gh_tag} already exists, uploading assets."
+        gh release upload "${gh_tag}" "${gh_assets[@]}" --repo "${gh_repo}" --clobber
+    else
+        gh release create "${gh_tag}" "${gh_assets[@]}" \
+            --repo "${gh_repo}" \
+            --title "${device_variant} - ${tag_name}" \
+            --notes "**Device:** ${device}
+**Variant:** VANILLA
+**Version:** ${version}"
+    fi
+
+    release_url="https://github.com/${gh_repo}/releases/download/${gh_tag}/$(basename ${filename})"
 
     _release_finish
 }
