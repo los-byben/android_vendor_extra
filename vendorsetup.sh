@@ -18,6 +18,10 @@ telegram() {
     ~/telegram.sh/telegram "$message"
 }
 
+human_size() {
+    numfmt --to=iec --suffix=B "$1" 2>/dev/null || echo "$1 B"
+}
+
 sign() {
     keys_path="${ANDROID_BUILD_TOP}/vendor/lineage-priv/keys"
 
@@ -95,7 +99,7 @@ _release_common() {
 
     get_prop() {
         local prop="$1"
-        grep -h "^${prop}=" "${OUT}/system/build.prop" "${OUT}/product/etc/build.prop" 2>/dev/null | \
+        grep -h "^${prop}=" "${OUT}/system/build.prop" "${OUT}/product/etc/build.prop" "${OUT}/vendor/build.prop" 2>/dev/null | \
         head -1 | cut -d= -f2- | sed 's/^[[:space:]]*//;s/[[:space:]]*$//'
     }
 
@@ -154,6 +158,45 @@ _release_common() {
     echo "[INFO] Initial extraimages value: ${extraimages}"
 
     images=$(echo "${extraimages}" | grep -oP '\b\w*image\w*\b')
+}
+
+send_release_notes() {
+    local date_fmt
+    if [[ "${tag_name}" =~ ^[0-9]{8}$ ]]; then
+        date_fmt="${tag_name:0:4}-${tag_name:4:2}-${tag_name:6:2}"
+    elif [[ -n "${datetime}" ]]; then
+        date_fmt=$(date -u -d "@${datetime}" +%F)
+    else
+        date_fmt="unknown"
+    fi
+
+    local type_lower
+    type_lower=$(tr '[:upper:]' '[:lower:]' <<< "${type}")
+
+    local title="LineageOS ${version} for ${device}"
+
+    local tmp_url="${release_url%/download}"
+    local sf_dir="${tmp_url%/*}/"
+
+    local msg="${title}"
+    msg+=$'\n\n'"Date: ${date_fmt}"
+    msg+=$'\n'"Type: ${type_lower}"
+    msg+=$'\n'"OS patch level: ${os_patch_level}"
+    msg+=$'\n'"Download: <a href=\"${release_url}\">${filename}</a> ($(human_size "${size}"))"
+    msg+=$'\n\n'"Additional files:"
+
+    local image image_path base fsize furl
+    while IFS= read -r image; do
+        [[ -z "${image}" ]] && continue
+        image_path="${image_map[${image}]:-}"
+        [[ -f "${image_path}" ]] || continue
+        base="$(basename "${image_path}")"
+        fsize=$(stat -c%s "${image_path}")
+        furl="${sf_dir}${base}/download"
+        msg+=$'\n'"<a href=\"${furl}\">${base}</a> ($(human_size "${fsize}"))"
+    done <<< "${images}"
+
+    telegram "${msg}"
 }
 
 _release_finish() {
@@ -232,7 +275,7 @@ _release_finish() {
     rm -rf "${ANDROID_BUILD_TOP}/ota"
 
     echo -e "\e[32m[INFO]\e[0m Release created successfully!"
-    telegram "[INFO] Release created successfully for ${device_variant}."
+    send_release_notes
 }
 
 release_gms() {
