@@ -1,0 +1,423 @@
+From 3304e45a152c7a4ac49c6ee62f1a45861638451d Mon Sep 17 00:00:00 2001
+From: minaripenguin <minaripenguin@users.noreply.github.com>
+Date: Fri, 1 Dec 2023 15:09:21 +0800
+Subject: [PATCH 1/2] SystemUI: Re-Introduce wifi standard icon feature
+
+* icons taken from: a799a35c5527482f2d577783170b0478b8021b3f "base: Refactor Wi-Fi standard icons"
+
+[neobuddy89: Added wifi 7 icon]
+[erfanabdi: Move standard icon to the left side]
+[Dhina17: Avoid usage of Resources#getIdentifier() , Switch to ContentObserver]
+[ghostrider-reborn: Move to SB tuner]
+
+Change-Id: I187fc97b9f4ad6d48b6c6f0b1215ffbcb1c972e2
+
+Change-Id: I0ed9d347121ec4df6e5ca98c7f5533d51532bd66
+Co-Authored-By: Adithya R <gh0strider.2k18.reborn@gmail.com>
+Co-Authored-By: Dhina17 <dhinalogu@gmail.com>
+---
+ packages/SettingsLib/res/values/config.xml    |   3 +
+ .../drawable/ic_statusbar_wifi_standard.xml   |  42 +++++
+ .../res/drawable/ic_wifi_standard_4.xml       |  16 ++
+ .../res/drawable/ic_wifi_standard_5.xml       |  16 ++
+ .../res/drawable/ic_wifi_standard_6.xml       |  16 ++
+ .../res/drawable/ic_wifi_standard_7.xml       |  16 ++
+ .../layout/status_bar_wifi_group_inner.xml    |   4 +
+ packages/SystemUI/res/values/cm_strings.xml   |   3 +
+ .../SystemUI/res/xml/status_bar_prefs.xml     |   6 +
+ .../statusbar/WifiStandardImageView.kt        | 163 ++++++++++++++++++
+ .../pipeline/wifi/ui/binder/WifiViewBinder.kt |   2 +
+ 11 files changed, 287 insertions(+)
+ create mode 100644 packages/SystemUI/res/drawable/ic_statusbar_wifi_standard.xml
+ create mode 100644 packages/SystemUI/res/drawable/ic_wifi_standard_4.xml
+ create mode 100644 packages/SystemUI/res/drawable/ic_wifi_standard_5.xml
+ create mode 100644 packages/SystemUI/res/drawable/ic_wifi_standard_6.xml
+ create mode 100644 packages/SystemUI/res/drawable/ic_wifi_standard_7.xml
+ create mode 100644 packages/SystemUI/src/com/android/systemui/statusbar/WifiStandardImageView.kt
+
+diff --git a/packages/SettingsLib/res/values/config.xml b/packages/SettingsLib/res/values/config.xml
+index 40de176d6..a8681359d 100644
+--- a/packages/SettingsLib/res/values/config.xml
++++ b/packages/SettingsLib/res/values/config.xml
+@@ -32,6 +32,9 @@
+     data icon on devices -->
+     <bool name="config_hspa_data_distinguishable">false</bool>
+ 
++    <!-- Control whether to show Wifi standard in Wifi icon -->
++    <bool name="config_show_wifi_standard">false</bool>
++
+     <!-- Edit User avatar explicit package name -->
+     <string name="config_avatar_picker_package" translatable="false">
+         com.android.avatarpicker
+diff --git a/packages/SystemUI/res/drawable/ic_statusbar_wifi_standard.xml b/packages/SystemUI/res/drawable/ic_statusbar_wifi_standard.xml
+new file mode 100644
+index 000000000..0944e0206
+--- /dev/null
++++ b/packages/SystemUI/res/drawable/ic_statusbar_wifi_standard.xml
+@@ -0,0 +1,42 @@
++<?xml version="1.0" encoding="utf-8"?>
++<!--
++    Copyright (c) 2019, The Linux Foundation. All rights reserved.
++
++    Redistribution and use in source and binary forms, with or without
++    modification, are permitted provided that the following conditions are
++    met:
++        * Redistributions of source code must retain the above copyright
++          notice, this list of conditions and the following disclaimer.
++        * Redistributions in binary form must reproduce the above
++          copyright notice, this list of conditions and the following
++          disclaimer in the documentation and/or other materials provided
++          with the distribution.
++        * Neither the name of The Linux Foundation nor the names of its
++          contributors may be used to endorse or promote products derived
++          from this software without specific prior written permission.
++
++    THIS SOFTWARE IS PROVIDED "AS IS" AND ANY EXPRESS OR IMPLIED
++    WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF
++    MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NON-INFRINGEMENT
++    ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS
++    BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
++    CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
++    SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR
++    BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
++    WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE
++    OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN
++    IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
++-->
++<vector xmlns:android="http://schemas.android.com/apk/res/android"
++    android:width="26dp"
++    android:height="24dp"
++    android:viewportWidth="26"
++    android:viewportHeight="24"
++    android:tint="?android:attr/colorControlNormal">
++    <path
++        android:fillColor="#FFFFFFFF"
++        android:pathData="m 25.626571,16.969114 v 0 q 0,1.36304 -0.84885,2.1693 -0.84886,0.80626 -2.32751,0.80626 v 0 q -1.29001,0 -2.06585,-0.58112 -0.77583,-0.58112 -0.95838,-1.6825 v 0 l 1.70988,-0.13995 q 0.13387,0.54765 0.47462,0.79713 0.34076,0.24949 0.85799,0.24949 v 0 q 0.63892,0 1.01923,-0.4077 0.38031,-0.40769 0.38031,-1.1744 v 0 q 0,-0.67543 -0.35901,-1.08008 -0.35902,-0.40465 -1.00402,-0.40465 v 0 q -0.71195,0 -1.16223,0.55373 v 0 h -1.66729 l 0.29817,-4.825391 h 5.15397 v 1.27176 h -3.6023 l -0.13996,2.166251 q 0.62067,-0.54764 1.55167,-0.54764 v 0 q 1.22308,0 1.95632,0.76062 0.73324,0.76062 0.73324,2.06889 z"/>
++    <path
++        android:fillColor="#FFFFFFFF"
++        android:pathData="m 12.998641,2.099185 c -7.3000003,0 -12.0991851,4.002174 -12.59918509,4.402174 L 12.998641,21.998642 16.944293,17.148098 a 7.7288137,8.3389834 0 0 1 -0.06114,-0.978261 7.7288137,8.3389834 0 0 1 7.634511,-8.335597 l 1.084238,-1.332881 c -0.499999,-0.4 -5.303261,-4.402174 -12.603261,-4.402174 z"/>
++</vector>
+diff --git a/packages/SystemUI/res/drawable/ic_wifi_standard_4.xml b/packages/SystemUI/res/drawable/ic_wifi_standard_4.xml
+new file mode 100644
+index 000000000..d4c0d83dd
+--- /dev/null
++++ b/packages/SystemUI/res/drawable/ic_wifi_standard_4.xml
+@@ -0,0 +1,16 @@
++<?xml version="1.0" encoding="utf-8"?>
++<!--
++     Copyright (C) 2022 Project Kaleidoscope
++               (C) 2022 Paranoid Android
++
++     SPDX-License-Identifier: Apache-2.0
++-->
++<vector xmlns:android="http://schemas.android.com/apk/res/android"
++    android:width="24dp"
++    android:height="24dp"
++    android:viewportWidth="24"
++    android:viewportHeight="24">
++    <path
++        android:fillColor="@android:color/white"
++        android:pathData="M 17.37 19.6795 L 17.37 18.85 L 21.318 13.1905 L 22.368 13.1905 L 22.368 18.661 L 23.5335 18.661 L 23.5335 19.711 L 22.389 19.711 L 22.389 21.5905 L 21.15 21.5905 L 21.15 19.6795 Z M 18.7245 18.6295 L 21.15 18.6295 L 21.15 15.2695 Z"/>
++</vector>
+diff --git a/packages/SystemUI/res/drawable/ic_wifi_standard_5.xml b/packages/SystemUI/res/drawable/ic_wifi_standard_5.xml
+new file mode 100644
+index 000000000..ce06aa46f
+--- /dev/null
++++ b/packages/SystemUI/res/drawable/ic_wifi_standard_5.xml
+@@ -0,0 +1,16 @@
++<?xml version="1.0" encoding="utf-8"?>
++<!--
++     Copyright (C) 2022 Project Kaleidoscope
++               (C) 2022 Paranoid Android
++
++     SPDX-License-Identifier: Apache-2.0
++-->
++<vector xmlns:android="http://schemas.android.com/apk/res/android"
++    android:width="24dp"
++    android:height="24dp"
++    android:viewportWidth="24"
++    android:viewportHeight="24">
++    <path
++        android:fillColor="@android:color/white"
++        android:pathData="M 23.7861 19.4085 L 23.7861 19.4085 Q 23.7861 20.5739 23.0602 21.263 Q 22.3343 21.953 21.0697 21.953 L 21.0697 21.953 Q 19.9668 21.953 19.3033 21.4562 Q 18.6407 20.9586 18.4842 20.0173 L 18.4842 20.0173 L 19.9463 19.8976 Q 20.0608 20.3661 20.3515 20.579 Q 20.6431 20.7927 21.0851 20.7927 L 21.0851 20.7927 Q 21.6315 20.7927 21.9572 20.4439 Q 22.2821 20.0951 22.2821 19.4401 L 22.2821 19.4401 Q 22.2821 18.8621 21.9752 18.5167 Q 21.6682 18.1705 21.1168 18.1705 L 21.1168 18.1705 Q 20.508 18.1705 20.1233 18.6441 L 20.1233 18.6441 L 18.6971 18.6441 L 18.9528 14.5179 L 23.3594 14.5179 L 23.3594 15.6055 L 20.2789 15.6055 L 20.1592 17.4574 Q 20.6901 16.9897 21.4861 16.9897 L 21.4861 16.9897 Q 22.5318 16.9897 23.1585 17.6395 Q 23.7861 18.2902 23.7861 19.4085 Z"/>
++</vector>
+diff --git a/packages/SystemUI/res/drawable/ic_wifi_standard_6.xml b/packages/SystemUI/res/drawable/ic_wifi_standard_6.xml
+new file mode 100644
+index 000000000..2e51071d9
+--- /dev/null
++++ b/packages/SystemUI/res/drawable/ic_wifi_standard_6.xml
+@@ -0,0 +1,16 @@
++<?xml version="1.0" encoding="utf-8"?>
++<!--
++     Copyright (C) 2022 Project Kaleidoscope
++               (C) 2022 Paranoid Android
++
++     SPDX-License-Identifier: Apache-2.0
++-->
++<vector xmlns:android="http://schemas.android.com/apk/res/android"
++    android:width="24dp"
++    android:height="24dp"
++    android:viewportWidth="24"
++    android:viewportHeight="24">
++    <path
++        android:fillColor="@android:color/white"
++        android:pathData="M 23.8067 19.3448 L 23.8067 19.3448 Q 23.8067 20.5343 23.0721 21.2102 Q 22.3365 21.8872 21.0423 21.8872 L 21.0423 21.8872 Q 19.5903 21.8872 18.8114 20.9647 Q 18.0325 20.0425 18.0325 18.2302 L 18.0325 18.2302 Q 18.0325 16.2374 18.8231 15.2302 Q 19.6137 14.224 21.083 14.224 L 21.083 14.224 Q 22.1271 14.224 22.731 14.6418 Q 23.3338 15.0589 23.5847 15.936 L 23.5847 15.936 L 22.0396 16.1319 Q 21.8176 15.3972 21.0478 15.3972 L 21.0478 15.3972 Q 20.3889 15.3972 20.0126 15.9947 Q 19.6362 16.5912 19.6362 17.8069 L 19.6362 17.8069 Q 19.8989 17.4107 20.3656 17.1995 Q 20.8321 16.9875 21.4214 16.9875 L 21.4214 16.9875 Q 22.5234 16.9875 23.165 17.622 Q 23.8067 18.2564 23.8067 19.3448 Z M 22.1614 19.3872 L 22.1614 19.3872 Q 22.1614 18.7527 21.8383 18.417 Q 21.5144 18.0821 20.9485 18.0821 L 20.9485 18.0821 Q 20.4061 18.0821 20.0803 18.3962 Q 19.7536 18.7103 19.7536 19.2283 L 19.7536 19.2283 Q 19.7536 19.8781 20.0948 20.3041 Q 20.4359 20.7292 20.99 20.7292 L 20.99 20.7292 Q 21.5433 20.7292 21.8529 20.3728 Q 22.1614 20.0162 22.1614 19.3872 Z"/>
++</vector>
+diff --git a/packages/SystemUI/res/drawable/ic_wifi_standard_7.xml b/packages/SystemUI/res/drawable/ic_wifi_standard_7.xml
+new file mode 100644
+index 000000000..9450d7ac0
+--- /dev/null
++++ b/packages/SystemUI/res/drawable/ic_wifi_standard_7.xml
+@@ -0,0 +1,16 @@
++<?xml version="1.0" encoding="utf-8"?>
++<!--
++     Copyright (C) 2023 Paranoid Android
++
++     SPDX-License-Identifier: Apache-2.0
++-->
++<vector xmlns:android="http://schemas.android.com/apk/res/android"
++    android:width="24dp"
++    android:height="24dp"
++    android:viewportWidth="24"
++    android:viewportHeight="24">
++    <path
++        android:pathData="M 23.843 16.451 L 20.411 22 L 18.267 21.976 L 21.831 16.377 L 18 16.335 L 18.014 15 L 23.858 15.066 Z"
++        android:fillColor="@android:color/white"
++        android:strokeWidth="1"/>
++</vector>
+diff --git a/packages/SystemUI/res/layout/status_bar_wifi_group_inner.xml b/packages/SystemUI/res/layout/status_bar_wifi_group_inner.xml
+index e8b8922a1..552ee5051 100644
+--- a/packages/SystemUI/res/layout/status_bar_wifi_group_inner.xml
++++ b/packages/SystemUI/res/layout/status_bar_wifi_group_inner.xml
+@@ -57,6 +57,10 @@
+                 android:id="@+id/wifi_signal"
+                 android:layout_height="@dimen/status_bar_wifi_signal_size"
+                 android:layout_width="@dimen/status_bar_wifi_signal_size" />
++            <com.android.systemui.statusbar.WifiStandardImageView
++                android:id="@+id/wifi_standard"
++                android:layout_height="@dimen/status_bar_wifi_signal_size"
++                android:layout_width="@dimen/status_bar_wifi_signal_size" />
+         </FrameLayout>
+ 
+         <View
+diff --git a/packages/SystemUI/res/values/cm_strings.xml b/packages/SystemUI/res/values/cm_strings.xml
+index 2482f6989..1815c4795 100644
+--- a/packages/SystemUI/res/values/cm_strings.xml
++++ b/packages/SystemUI/res/values/cm_strings.xml
+@@ -129,4 +129,7 @@
+     <string name="screenrecord_skip_time_summary">Remove the 3 second wait</string>
+     <string name="screenrecord_hevc_switch_label">HEVC encoding</string>
+     <string name="screenrecord_hevc_switch_summary">Use the more efficient HEVC encoder</string>
++
++    <!-- Wi-Fi standard number -->
++    <string name="status_bar_wifi_standard">Wi-Fi standard number</string>
+ </resources>
+diff --git a/packages/SystemUI/res/xml/status_bar_prefs.xml b/packages/SystemUI/res/xml/status_bar_prefs.xml
+index 76f78409e..8bd0690e6 100644
+--- a/packages/SystemUI/res/xml/status_bar_prefs.xml
++++ b/packages/SystemUI/res/xml/status_bar_prefs.xml
+@@ -86,6 +86,12 @@
+         android:key="wifi"
+         android:title="@string/quick_settings_wifi_label" />
+ 
++    <com.android.systemui.tuner.TunerSwitch
++        android:key="wifi_standard"
++        android:title="@string/status_bar_wifi_standard"
++        sysui:defValue="@bool/config_show_wifi_standard"
++        android:icon="@drawable/ic_statusbar_wifi_standard" />
++
+     <com.android.systemui.tuner.StatusBarSwitch
+         android:icon="@drawable/ic_statusbar_ethernet"
+         android:key="ethernet"
+diff --git a/packages/SystemUI/src/com/android/systemui/statusbar/WifiStandardImageView.kt b/packages/SystemUI/src/com/android/systemui/statusbar/WifiStandardImageView.kt
+new file mode 100644
+index 000000000..172941be3
+--- /dev/null
++++ b/packages/SystemUI/src/com/android/systemui/statusbar/WifiStandardImageView.kt
+@@ -0,0 +1,163 @@
++/*
++ * Copyright (C) 2023 The risingOS Android Project
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *      http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License
++ */
++package com.android.systemui.statusbar
++
++import android.content.Context
++import android.database.ContentObserver
++import android.os.UserHandle
++import android.net.ConnectivityManager
++import android.net.Network
++import android.net.NetworkCapabilities
++import android.net.NetworkRequest
++import android.net.wifi.WifiManager
++import android.provider.Settings
++import android.util.AttributeSet
++import android.widget.ImageView
++import com.android.systemui.res.R
++
++const val TUNER_KEY = "wifi_standard"
++
++class WifiStandardImageView @JvmOverloads constructor(
++    context: Context, attrs: AttributeSet? = null, defStyleAttr: Int = 0
++) : ImageView(context, attrs, defStyleAttr) {
++
++    private val connectivityManager: ConnectivityManager by lazy {
++        context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
++    }
++    private val wifiManager: WifiManager by lazy {
++        context.applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager
++    }
++    private var networkCallback: ConnectivityManager.NetworkCallback? = null
++    private var wifiStandardEnabled = false
++    private var isRegistered = false
++
++    init {
++        setupContentObserver()
++    }
++
++    override fun onAttachedToWindow() {
++        super.onAttachedToWindow()
++        showWifiStandard()
++    }
++
++    override fun onDetachedFromWindow() {
++        super.onDetachedFromWindow()
++        unregisterNetworkCallback()
++    }
++
++    private fun setupContentObserver() {
++        val showWifiStandardIcon = Settings.Secure.getUriFor(TUNER_KEY)
++        val contentObserver = object: ContentObserver(null) {
++            override fun onChange(selfChange: Boolean) {
++                wifiStandardEnabled = Settings.Secure.getIntForUser(context.contentResolver,
++                        TUNER_KEY, 0, UserHandle.USER_CURRENT) == 1
++                if (wifiStandardEnabled) {
++                    showWifiStandard()
++                } else {
++                    unregisterNetworkCallback()
++                }
++            }
++        }
++        context.contentResolver.registerContentObserver(
++                showWifiStandardIcon, false, contentObserver, UserHandle.USER_CURRENT)
++        contentObserver.onChange(true)
++    }
++
++    private fun showWifiStandard() {
++        if (!wifiStandardEnabled || networkCallback != null) return
++        networkCallback = object : ConnectivityManager.NetworkCallback() {
++            override fun onAvailable(network: Network) {
++                updateWifiStandard(network)
++            }
++
++            override fun onUnavailable() {
++                updateWifiStandard(null)
++            }
++
++            override fun onCapabilitiesChanged(
++                network: Network,
++                networkCapabilities: NetworkCapabilities
++            ) {
++                if (networkCapabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI)) {
++                    updateWifiStandard(network)
++                }
++            }
++        }
++        registerNetworkCallback()
++    }
++
++    private fun updateWifiStandard(network: Network?) {
++        val wifiStandard = if (network != null) getWifiStandard(network) else -1
++        updateIcon(wifiStandard)
++    }
++
++    private fun getWifiStandard(network: Network): Int {
++        val networkCapabilities = connectivityManager.getNetworkCapabilities(network)
++        return if (networkCapabilities != null &&
++                networkCapabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) &&
++                networkCapabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)) {
++            val wifiInfo = wifiManager.connectionInfo
++            wifiInfo.wifiStandard
++        } else {
++            -1
++        }
++    }
++
++    private fun updateIcon(wifiStandard: Int) {
++        val drawableId = getDrawableForWifiStandard(wifiStandard)
++        if (!wifiStandardEnabled || drawableId == 0) {
++            post { visibility = GONE }
++            return
++        }
++        post {
++            setImageResource(drawableId)
++            visibility = VISIBLE
++        }
++    }
++
++    private fun getDrawableForWifiStandard(wifiStandard: Int): Int {
++        return when (wifiStandard) {
++            4 -> R.drawable.ic_wifi_standard_4
++            5 -> R.drawable.ic_wifi_standard_5
++            6 -> R.drawable.ic_wifi_standard_6
++            7 -> R.drawable.ic_wifi_standard_7
++            else -> 0
++        }
++    }
++
++    private fun registerNetworkCallback() {
++        if (isRegistered || networkCallback == null) return
++        val networkRequest = NetworkRequest.Builder()
++            .addTransportType(NetworkCapabilities.TRANSPORT_WIFI)
++            .build()
++        connectivityManager.registerNetworkCallback(networkRequest, networkCallback!!)
++        isRegistered = true
++    }
++
++    private fun unregisterNetworkCallback() {
++        if (!isRegistered || networkCallback == null) return
++        try {
++            networkCallback?.let { connectivityManager.unregisterNetworkCallback(it) }
++            post {
++                visibility = GONE
++            }
++        } catch (e: IllegalArgumentException) {
++        } finally {
++            networkCallback = null
++            isRegistered = false
++        }
++    }
++}
+diff --git a/packages/SystemUI/src/com/android/systemui/statusbar/pipeline/wifi/ui/binder/WifiViewBinder.kt b/packages/SystemUI/src/com/android/systemui/statusbar/pipeline/wifi/ui/binder/WifiViewBinder.kt
+index a7eecf9a6..9f093a0fc 100644
+--- a/packages/SystemUI/src/com/android/systemui/statusbar/pipeline/wifi/ui/binder/WifiViewBinder.kt
++++ b/packages/SystemUI/src/com/android/systemui/statusbar/pipeline/wifi/ui/binder/WifiViewBinder.kt
+@@ -58,6 +58,7 @@ object WifiViewBinder {
+         val activityInView = view.requireViewById<ImageView>(R.id.wifi_in)
+         val activityOutView = view.requireViewById<ImageView>(R.id.wifi_out)
+         val activityContainerView = view.requireViewById<View>(R.id.inout_container)
++        val wifiStandardView = view.requireViewById<ImageView>(R.id.wifi_standard)
+ 
+         view.isVisible = true
+         iconView.isVisible = true
+@@ -107,6 +108,7 @@ object WifiViewBinder {
+                         iconView.imageTintList = tintList
+                         activityInView.imageTintList = tintList
+                         activityOutView.imageTintList = tintList
++                        wifiStandardView.imageTintList = tintList
+                         dotView.setDecorColor(tint)
+                     }
+                 }
+-- 
+2.54.0
+
