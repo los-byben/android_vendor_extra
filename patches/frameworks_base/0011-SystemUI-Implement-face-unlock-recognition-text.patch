@@ -1,0 +1,131 @@
+From f5badb2279859257a77314ad9afcb17aeac6aa83 Mon Sep 17 00:00:00 2001
+From: minaripenguin <minaripenguin@users.noreply.github.com>
+Date: Thu, 30 Nov 2023 10:39:01 +0800
+Subject: [PATCH 11/11] SystemUI: Implement face unlock recognition text
+
+Change-Id: Ib7a0562e2d134b9fed9e45293939db3786c54f24
+---
+ packages/SystemUI/res/values/cm_strings.xml   |  3 ++
+ .../KeyguardIndicationController.java         | 45 ++++++++++++++++++-
+ 2 files changed, 46 insertions(+), 2 deletions(-)
+
+diff --git a/packages/SystemUI/res/values/cm_strings.xml b/packages/SystemUI/res/values/cm_strings.xml
+index 1815c4795..de3a682d9 100644
+--- a/packages/SystemUI/res/values/cm_strings.xml
++++ b/packages/SystemUI/res/values/cm_strings.xml
+@@ -132,4 +132,7 @@
+ 
+     <!-- Wi-Fi standard number -->
+     <string name="status_bar_wifi_standard">Wi-Fi standard number</string>
++
++    <!-- Face unlock -->
++    <string name="face_unlock_recognizing">Recognizing face...</string>
+ </resources>
+diff --git a/packages/SystemUI/src/com/android/systemui/statusbar/KeyguardIndicationController.java b/packages/SystemUI/src/com/android/systemui/statusbar/KeyguardIndicationController.java
+index 78b0da52d..803f13c51 100644
+--- a/packages/SystemUI/src/com/android/systemui/statusbar/KeyguardIndicationController.java
++++ b/packages/SystemUI/src/com/android/systemui/statusbar/KeyguardIndicationController.java
+@@ -159,6 +159,8 @@ public class KeyguardIndicationController {
+ 
+     private static final int MSG_SHOW_ACTION_TO_UNLOCK = 1;
+     private static final int MSG_RESET_ERROR_MESSAGE_ON_SCREEN_ON = 2;
++    private static final int MSG_SHOW_RECOGNIZING_FACE = 3;
++    private static final int MSG_HIDE_RECOGNIZING_FACE = 4;
+     private static final long TRANSIENT_BIOMETRIC_ERROR_TIMEOUT = 1300;
+     public static final long DEFAULT_MESSAGE_TIME = 3500;
+     public static final long DEFAULT_HIDE_DELAY_MS =
+@@ -238,6 +240,7 @@ public class KeyguardIndicationController {
+     private Set<Integer> mCoExFaceAcquisitionMsgIdsToShow;
+     private final FaceHelpMessageDeferral mFaceAcquiredMessageDeferral;
+     private boolean mInited;
++    private boolean mFaceDetectionRunning;
+ 
+     private KeyguardUpdateMonitorCallback mUpdateMonitorCallback;
+ 
+@@ -283,6 +286,15 @@ public class KeyguardIndicationController {
+                 mBiometricErrorMessageToShowOnScreenOn = null;
+             }
+         }
++
++        @Override
++        public void onScreenTurnedOff() {
++            if (mFaceDetectionRunning) {
++                mFaceDetectionRunning = false;
++                mBiometricErrorMessageToShowOnScreenOn = null;
++                hideFaceUnlockRecognizingMessage();
++            }
++        }
+     };
+     private boolean mFaceLockedOutThisAuthSession;
+ 
+@@ -378,6 +390,11 @@ public class KeyguardIndicationController {
+                     showActionToUnlock();
+                 } else if (msg.what == MSG_RESET_ERROR_MESSAGE_ON_SCREEN_ON) {
+                     mBiometricErrorMessageToShowOnScreenOn = null;
++                } else if (msg.what == MSG_SHOW_RECOGNIZING_FACE) {
++                    mBiometricErrorMessageToShowOnScreenOn = null;
++                    showFaceUnlockRecognizingMessage();
++                } else if (msg.what == MSG_HIDE_RECOGNIZING_FACE) {
++                    hideFaceUnlockRecognizingMessage();
+                 }
+             }
+         };
+@@ -1144,6 +1161,18 @@ public class KeyguardIndicationController {
+         }
+     }
+ 
++    private void showFaceUnlockRecognizingMessage() {
++        String faceUnlockMessage = mContext.getString(R.string.face_unlock_recognizing);
++        showBiometricMessage(faceUnlockMessage, FACE);
++    }
++
++    private void hideFaceUnlockRecognizingMessage() {
++        String faceUnlockMessage = mContext.getString(R.string.face_unlock_recognizing);
++        if (TextUtils.equals(mBiometricMessage, faceUnlockMessage)) {
++            hideBiometricMessage();
++        }
++    }
++
+     /**
+      * Hides transient indication.
+      */
+@@ -1660,8 +1689,18 @@ public class KeyguardIndicationController {
+         @Override
+         public void onBiometricRunningStateChanged(boolean running,
+                 BiometricSourceType biometricSourceType) {
+-            if (!running && biometricSourceType == FACE) {
+-                showTrustAgentErrorMessage(mTrustAgentErrorMessage);
++            if (biometricSourceType == BiometricSourceType.FACE) {
++                mFaceDetectionRunning = running;
++                if (running) {
++                    mHandler.removeMessages(MSG_HIDE_RECOGNIZING_FACE);
++                    mHandler.removeMessages(MSG_SHOW_RECOGNIZING_FACE);
++                    mHandler.sendEmptyMessageDelayed(MSG_SHOW_RECOGNIZING_FACE, 100);
++                } else {
++                    mHandler.removeMessages(MSG_SHOW_RECOGNIZING_FACE);
++                    mHandler.removeMessages(MSG_HIDE_RECOGNIZING_FACE);
++                    mHandler.sendEmptyMessageDelayed(MSG_HIDE_RECOGNIZING_FACE, 100);
++                    showTrustAgentErrorMessage(mTrustAgentErrorMessage);
++                }
+             }
+         }
+ 
+@@ -1839,6 +1878,7 @@ public class KeyguardIndicationController {
+ 
+                     if (mDozing) {
+                         hideBiometricMessage();
++                        hideFaceUnlockRecognizingMessage();
+                     }
+                     updateDeviceEntryIndication(false);
+                 }
+@@ -1852,6 +1892,7 @@ public class KeyguardIndicationController {
+ 
+                     if (mDreaming) {
+                         hideBiometricMessage();
++                        hideFaceUnlockRecognizingMessage();
+                     }
+                 }
+             };
+-- 
+2.54.0
+
