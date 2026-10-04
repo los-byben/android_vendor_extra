@@ -1,0 +1,83 @@
+From e90837d36e4fba607744ad2f3baa898feeda2f71 Mon Sep 17 00:00:00 2001
+From: Byben <heybyben@gmail.com>
+Date: Sun, 4 Oct 2026 14:20:24 +0700
+Subject: [PATCH 28/32] Launcher3: QuickSpace: rename cr_* res files to
+ quickspace_*
+
+Drop crDroid branding from resource filenames; move the pinned
+container id into id.xml and drop cr_config.xml.
+
+Change-Id: Icb7fa52717b61da939c41c8c6f0dad50343697bb
+---
+ .../{cr_dimens.xml => quickspace_dimens.xml}  |  0
+ res/values/cr_config.xml                      | 21 -------------------
+ res/values/id.xml                             |  2 ++
+ .../{cr_arrays.xml => quickspace_arrays.xml}  |  0
+ ...{cr_strings.xml => quickspace_strings.xml} |  0
+ .../{cr_styles.xml => quickspace_styles.xml}  |  0
+ 6 files changed, 2 insertions(+), 21 deletions(-)
+ rename quickstep/res/values/{cr_dimens.xml => quickspace_dimens.xml} (100%)
+ delete mode 100644 res/values/cr_config.xml
+ rename res/values/{cr_arrays.xml => quickspace_arrays.xml} (100%)
+ rename res/values/{cr_strings.xml => quickspace_strings.xml} (100%)
+ rename res/values/{cr_styles.xml => quickspace_styles.xml} (100%)
+
+diff --git a/quickstep/res/values/cr_dimens.xml b/quickstep/res/values/quickspace_dimens.xml
+similarity index 100%
+rename from quickstep/res/values/cr_dimens.xml
+rename to quickstep/res/values/quickspace_dimens.xml
+diff --git a/res/values/cr_config.xml b/res/values/cr_config.xml
+deleted file mode 100644
+index 51244f1e31..0000000000
+--- a/res/values/cr_config.xml
++++ /dev/null
+@@ -1,21 +0,0 @@
+-<?xml version="1.0" encoding="utf-8"?>
+-<!--
+-     Copyright (C) 2016-2026 crDroid Android Project
+-
+-     Licensed under the Apache License, Version 2.0 (the "License");
+-     you may not use this file except in compliance with the License.
+-     You may obtain a copy of the License at
+-
+-          http://www.apache.org/licenses/LICENSE-2.0
+-
+-     Unless required by applicable law or agreed to in writing, software
+-     distributed under the License is distributed on an "AS IS" BASIS,
+-     WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+-     See the License for the specific language governing permissions and
+-     limitations under the License.
+--->
+-<resources>
+-
+-    <!-- Quickspace -->
+-    <item type="id" name="reserved_container_workspace" />
+-</resources>
+diff --git a/res/values/id.xml b/res/values/id.xml
+index 96a2eb11ac..1e44940c4f 100644
+--- a/res/values/id.xml
++++ b/res/values/id.xml
+@@ -48,6 +48,8 @@
+     <item type="id" name="search_container_workspace" />
+     <item type="id" name="search_container_all_apps" />
+     <item type="id" name="search_container_hotseat" />
++    <!-- QuickSpace pinned container on first workspace screen -->
++    <item type="id" name="reserved_container_workspace" />
+ 
+     <!-- View ID to use for QSB widget -->
+     <item type="id" name="qsb_widget" />
+diff --git a/res/values/cr_arrays.xml b/res/values/quickspace_arrays.xml
+similarity index 100%
+rename from res/values/cr_arrays.xml
+rename to res/values/quickspace_arrays.xml
+diff --git a/res/values/cr_strings.xml b/res/values/quickspace_strings.xml
+similarity index 100%
+rename from res/values/cr_strings.xml
+rename to res/values/quickspace_strings.xml
+diff --git a/res/values/cr_styles.xml b/res/values/quickspace_styles.xml
+similarity index 100%
+rename from res/values/cr_styles.xml
+rename to res/values/quickspace_styles.xml
+-- 
+2.54.0
+

@@ -1,0 +1,27 @@
+From 546ad0a29a1cd381541af687cc507af078159a47 Mon Sep 17 00:00:00 2001
+From: Byben <heybyben@gmail.com>
+Date: Sun, 4 Oct 2026 14:24:36 +0700
+Subject: [PATCH 32/32] Launcher3: QuickSpace: follow OmniJawsClient package
+ rename
+
+Change-Id: Ieac931c04bf3a0862ddab577e19fa4169a102f79
+---
+ src/com/android/launcher3/quickspace/QuickspaceController.java | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/src/com/android/launcher3/quickspace/QuickspaceController.java b/src/com/android/launcher3/quickspace/QuickspaceController.java
+index 38726fe2fc..8569af365c 100644
+--- a/src/com/android/launcher3/quickspace/QuickspaceController.java
++++ b/src/com/android/launcher3/quickspace/QuickspaceController.java
+@@ -28,7 +28,7 @@ import android.text.TextUtils;
+ import android.util.Log;
+ import android.view.View.OnClickListener;
+ 
+-import com.android.internal.util.crdroid.OmniJawsClient;
++import com.android.internal.util.custom.OmniJawsClient;
+ 
+ import com.android.launcher3.LauncherPrefs;
+ import com.android.launcher3.R;
+-- 
+2.54.0
+

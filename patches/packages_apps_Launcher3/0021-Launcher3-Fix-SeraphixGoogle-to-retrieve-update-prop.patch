@@ -1,0 +1,116 @@
+From e8fb86e88a5c26012b85c6d0682a294de7be5c18 Mon Sep 17 00:00:00 2001
+From: Pranav Vashi <neobuddy89@gmail.com>
+Date: Mon, 18 Aug 2025 21:47:14 +0530
+Subject: [PATCH 21/32] Launcher3: Fix SeraphixGoogle to retrieve update
+ properly
+
+* Make the Smartspace parsing heuristic and not dependent on fixed Smartspace view IDs
+* Start the host listening before creating the view, so the first RemoteViews arrives reliably
+
+Signed-off-by: Pranav Vashi <neobuddy89@gmail.com>
+---
+ .../EphemeralWidgetHostViewGoogle.kt          | 36 ++++++++++---------
+ .../seraphixgoogle/SeraphixCompanion.kt       | 10 ------
+ .../seraphixgoogle/SeraphixDataProvider.kt    |  2 +-
+ 3 files changed, 21 insertions(+), 27 deletions(-)
+
+diff --git a/seraphixgoogle/src/io/chaldeaprjkt/seraphixgoogle/EphemeralWidgetHostViewGoogle.kt b/seraphixgoogle/src/io/chaldeaprjkt/seraphixgoogle/EphemeralWidgetHostViewGoogle.kt
+index c28dec945d..ba8e0cc707 100644
+--- a/seraphixgoogle/src/io/chaldeaprjkt/seraphixgoogle/EphemeralWidgetHostViewGoogle.kt
++++ b/seraphixgoogle/src/io/chaldeaprjkt/seraphixgoogle/EphemeralWidgetHostViewGoogle.kt
+@@ -17,13 +17,11 @@ package io.chaldeaprjkt.seraphixgoogle
+ 
+ import android.appwidget.AppWidgetHostView
+ import android.content.Context
++import android.graphics.drawable.BitmapDrawable
+ import android.widget.ImageView
+ import android.widget.RemoteViews
+ import android.widget.TextView
+ import io.chaldeaprjkt.seraphixgoogle.SeraphixCompanion.allChildren
+-import io.chaldeaprjkt.seraphixgoogle.SeraphixCompanion.bitmap
+-import io.chaldeaprjkt.seraphixgoogle.SeraphixCompanion.string
+-import io.chaldeaprjkt.seraphixgoogle.SeraphixCompanion.takeByName
+ 
+ class EphemeralWidgetHostViewGoogle(context: Context?) : AppWidgetHostView(context) {
+     private var listener: DataProviderListener? = null
+@@ -31,14 +29,25 @@ class EphemeralWidgetHostViewGoogle(context: Context?) : AppWidgetHostView(conte
+     override fun updateAppWidget(remoteViews: RemoteViews?) {
+         super.updateAppWidget(remoteViews)
+         val weather = Card()
+-        allChildren().forEach {
+-            when (it) {
+-                is ImageView -> it.takeByName<ImageView>(VID_WEATHER_ICON)
+-                    ?.let { x -> weather.image = x.bitmap }
+-                is TextView -> it.takeByName<TextView>(VID_WEATHER_TEXT)
+-                    ?.let { x -> weather.text = x.string }
+-            }
+-        }
++
++        val leaves = allChildren()
++        val textViews = leaves.filterIsInstance<TextView>().filter { it.text?.isNotEmpty() == true }
++        val imageViews = leaves.filterIsInstance<ImageView>().filter { it.drawable != null && it.drawable is BitmapDrawable }
++
++        val tempTv = textViews.firstOrNull { tv ->
++            val t = tv.text.toString()
++            t.contains("°") || t.contains("℃") || t.contains("℉")
++        } ?: textViews.lastOrNull()
++
++        weather.text = tempTv?.text?.toString()
++
++        val iconIv = imageViews.firstOrNull { iv ->
++            val n = try { resources.getResourceEntryName(iv.id) } catch (_: Exception) { "" }
++            n.contains("weather", true) || n.contains("icon", true) || n.contains("temp", true)
++        } ?: imageViews.firstOrNull()
++
++        weather.image = (iconIv?.drawable as? BitmapDrawable)?.bitmap
++
+         listener?.onDataUpdated(weather)
+     }
+ 
+@@ -46,9 +55,4 @@ class EphemeralWidgetHostViewGoogle(context: Context?) : AppWidgetHostView(conte
+         this.listener = listener
+         return this
+     }
+-
+-    companion object {
+-        const val VID_WEATHER_TEXT = "title_weather_text"
+-        const val VID_WEATHER_ICON = "title_weather_icon"
+-    }
+ }
+diff --git a/seraphixgoogle/src/io/chaldeaprjkt/seraphixgoogle/SeraphixCompanion.kt b/seraphixgoogle/src/io/chaldeaprjkt/seraphixgoogle/SeraphixCompanion.kt
+index 98459dce5a..804c2b41e9 100644
+--- a/seraphixgoogle/src/io/chaldeaprjkt/seraphixgoogle/SeraphixCompanion.kt
++++ b/seraphixgoogle/src/io/chaldeaprjkt/seraphixgoogle/SeraphixCompanion.kt
+@@ -47,14 +47,4 @@ object SeraphixCompanion {
+     }
+ 
+     fun ViewGroup.allChildren() = ArrayList<View>().also { allChildren(it) }
+-
+-    val ImageView.bitmap: Bitmap? get() = (drawable as BitmapDrawable?)?.bitmap
+-
+-    val TextView.string: String get() = text.toString()
+-
+-    inline fun <reified T> View.takeByName(name: String): T? = try {
+-        takeIf { id != -1 && resources.getResourceEntryName(id) == name } as T?
+-    } catch (e: Resources.NotFoundException) {
+-        null
+-    }
+ }
+diff --git a/seraphixgoogle/src/io/chaldeaprjkt/seraphixgoogle/SeraphixDataProvider.kt b/seraphixgoogle/src/io/chaldeaprjkt/seraphixgoogle/SeraphixDataProvider.kt
+index 2614394050..5d9a0cd2fa 100644
+--- a/seraphixgoogle/src/io/chaldeaprjkt/seraphixgoogle/SeraphixDataProvider.kt
++++ b/seraphixgoogle/src/io/chaldeaprjkt/seraphixgoogle/SeraphixDataProvider.kt
+@@ -62,9 +62,9 @@ class SeraphixDataProvider(
+ 
+         if (isWidgetBound) {
+             onBounded?.onBound(widgetId)
++            widgetHost.startListening()
+             widgetHostView = widgetHost.createView(context, widgetId, providerInfo)
+                     as EphemeralWidgetHostViewGoogle
+-            widgetHost.startListening()
+         }
+     }
+ 
+-- 
+2.54.0
+

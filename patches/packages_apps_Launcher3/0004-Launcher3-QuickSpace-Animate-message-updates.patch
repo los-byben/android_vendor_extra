@@ -1,0 +1,226 @@
+From af2a43ff033d1e2f6eca29dffbce2a376378cd91 Mon Sep 17 00:00:00 2001
+From: Dmitrii <bankersenator@gmail.com>
+Date: Sun, 3 Aug 2025 22:05:56 +0000
+Subject: [PATCH 04/32] Launcher3: QuickSpace: Animate message updates
+
+Add a slide-and-fade animation for QuickSpace PSA messages and "Now Playing" info to improve the UI
+
+Squashed:
+
+    From: Dmitrii <bankersenator@gmail.com>
+    Date: Sun, 3 Aug 2025 22:11:52 +0000
+    Subject: Launcher3: Improve QuickSpace performance and memory usage
+
+    Optimized QuickSpace by lazy-loading the ActionReceiver and only re-inflating the main layout when the UI style setting is changed.
+
+    These changes lead to a faster, more responsive launcher experience, especially on lower-end devices.
+
+    (Also includes minor corrections to resolve build errors from recent refactoring.)
+
+    Signed-off-by: Dmitrii <bankersenator@gmail.com>
+    Signed-off-by: Pranav Vashi <neobuddy89@gmail.com>
+
+Signed-off-by: Dmitrii <bankersenator@gmail.com>
+Signed-off-by: Pranav Vashi <neobuddy89@gmail.com>
+---
+ .../launcher3/quickspace/QuickSpaceView.java  | 87 ++++++++++++++-----
+ .../quickspace/QuickspaceController.java      |  3 -
+ 2 files changed, 67 insertions(+), 23 deletions(-)
+
+diff --git a/src/com/android/launcher3/quickspace/QuickSpaceView.java b/src/com/android/launcher3/quickspace/QuickSpaceView.java
+index df3ea2fc20..7e93558630 100644
+--- a/src/com/android/launcher3/quickspace/QuickSpaceView.java
++++ b/src/com/android/launcher3/quickspace/QuickSpaceView.java
+@@ -26,6 +26,8 @@ import android.util.AttributeSet;
+ import android.view.LayoutInflater;
+ import android.view.View;
+ import android.view.ViewGroup;
++import android.view.animation.AccelerateInterpolator;
++import android.view.animation.DecelerateInterpolator;
+ import android.widget.FrameLayout;
+ import android.widget.ImageView;
+ import android.widget.TextView;
+@@ -65,12 +67,13 @@ public class QuickSpaceView extends FrameLayout implements OnDataListener {
+     public boolean mWeatherAvailable;
+     public boolean mAttached;
+ 
++    private boolean mIsAlternateStyle = false;
++
+     private QuickSpaceActionReceiver mActionReceiver;
+     public QuickspaceController mController;
+ 
+     public QuickSpaceView(Context context, AttributeSet set) {
+         super(context, set);
+-        mActionReceiver = new QuickSpaceActionReceiver(context);
+         mController = new QuickspaceController(context);
+         mColorStateList = ColorStateList.valueOf(Themes.getAttrColor(getContext(), R.attr.workspaceTextColor));
+         mQuickspaceBackgroundRes = R.drawable.bg_quickspace;
+@@ -80,10 +83,10 @@ public class QuickSpaceView extends FrameLayout implements OnDataListener {
+     @Override
+     public void onDataUpdated() {
+         boolean altUI = LauncherPrefs.SHOW_QUICKSPACE_ALT.get(getContext());
+-        mIsQuickEvent = mController.isQuickEvent();
+-        if (mEventTitle == null || (altUI && mGreetingsExt == null)) {
++        if (mEventTitle == null || mIsAlternateStyle != altUI) {
+             prepareLayout(altUI);
+         }
++        mIsQuickEvent = mController.isQuickEvent();
+         mWeatherAvailable = mController.isWeatherAvailable();
+         loadDoubleLine(altUI);
+     }
+@@ -110,37 +113,41 @@ public class QuickSpaceView extends FrameLayout implements OnDataListener {
+                 mGreetingsExtClock.setVisibility(View.GONE);
+             }
+         }
+-        if (mIsQuickEvent && (LauncherPrefs.SHOW_QUICKSPACE_PSONALITY.get(getContext()) ||
+-                        mController.getEventController().isNowPlaying())) {
++        boolean shouldShowPsa = mIsQuickEvent && (LauncherPrefs.SHOW_QUICKSPACE_PSONALITY.get(getContext()) ||
++                        mController.getEventController().isNowPlaying());
++        if (shouldShowPsa) {
+             maybeSetMarquee(mEventTitle);
+             mEventTitle.setOnClickListener(mController.getEventController().getAction());
+-            mEventTitleSub.setVisibility(View.VISIBLE);
+             mEventTitleSub.setText(mController.getEventController().getActionTitle());
+             maybeSetMarquee(mEventTitleSub);
+             mEventTitleSub.setOnClickListener(mController.getEventController().getAction());
++
++            if (mEventTitleSub.getVisibility() != View.VISIBLE) {
++                animateIn(mEventTitleSub);
++            }
++
+             if (useAlternativeQuickspaceUI) {
+                 if (mController.getEventController().isNowPlaying()) {
+-                    mEventSubIcon.setVisibility(View.GONE);
+-                    mEventTitleSubColored.setVisibility(View.VISIBLE);
+-                    mNowPlayingIcon.setVisibility(View.VISIBLE);
++                    animateOut(mEventSubIcon);
++                    animateIn(mEventTitleSubColored);
++                    animateIn(mNowPlayingIcon);
+                     mNowPlayingIcon.setOnClickListener(mController.getEventController().getAction());
+                     mEventTitleSubColored.setText(getContext().getString(R.string.qe_now_playing_by));
+                     mEventTitleSubColored.setOnClickListener(mController.getEventController().getAction());
+                 } else {
+                     setEventSubIcon();
+-                    mEventTitleSubColored.setText("");
+-                    mEventTitleSubColored.setVisibility(View.GONE);
+-                    mNowPlayingIcon.setVisibility(View.GONE);
++                    animateOut(mEventTitleSubColored);
++                    animateOut(mNowPlayingIcon);
+                 }
+             } else {
+                 setEventSubIcon();
+             }
+         } else {
+-            mEventTitleSub.setVisibility(View.GONE);
+-            mEventSubIcon.setVisibility(View.GONE);
++            animateOut(mEventTitleSub);
++            animateOut(mEventSubIcon);
+             if (useAlternativeQuickspaceUI) {
+-                mEventTitleSubColored.setVisibility(View.GONE);
+-                mNowPlayingIcon.setVisibility(View.GONE);
++                animateOut(mEventTitleSubColored);
++                animateOut(mNowPlayingIcon);
+             }
+         }
+         bindWeather(mWeatherContentSub, mWeatherTempSub, mWeatherIconSub);
+@@ -163,12 +170,14 @@ public class QuickSpaceView extends FrameLayout implements OnDataListener {
+     private void setEventSubIcon() {
+         Drawable icon = mController.getEventController().getActionIcon();
+         if (icon != null) {
+-            mEventSubIcon.setVisibility(View.VISIBLE);
++            if (mEventSubIcon.getVisibility() != View.VISIBLE) {
++                animateIn(mEventSubIcon);
++            }
+             mEventSubIcon.setImageTintList(mController.getEventController().isNowPlaying() ? null : mColorStateList);
+             mEventSubIcon.setImageDrawable(icon);
+             mEventSubIcon.setOnClickListener(mController.getEventController().getAction());
+         } else {
+-            mEventSubIcon.setVisibility(View.GONE);
++            animateOut(mEventSubIcon);
+         }
+     }
+ 
+@@ -183,12 +192,21 @@ public class QuickSpaceView extends FrameLayout implements OnDataListener {
+             return;
+         }
+         boolean hasGoogleApp = isPackageEnabled("com.google.android.googlequicksearchbox", getContext());
+-        container.setVisibility(View.VISIBLE);
+-        container.setOnClickListener(hasGoogleApp ? mActionReceiver.getWeatherAction() : null);
++        if (container.getVisibility() != View.VISIBLE) {
++            animateIn(container);
++        }
++        container.setOnClickListener(hasGoogleApp ? getActionReceiver().getWeatherAction() : null);
+         title.setText(weatherTemp);
+         icon.setImageDrawable(mController.getWeatherIcon());
+     }
+ 
++    private QuickSpaceActionReceiver getActionReceiver() {
++        if (mActionReceiver == null) {
++            mActionReceiver = new QuickSpaceActionReceiver(getContext());
++        }
++        return mActionReceiver;
++    }
++
+     private final void loadViews() {
+         mEventTitle = (TextView) findViewById(R.id.quick_event_title);
+         mEventTitleSub = (TextView) findViewById(R.id.quick_event_title_sub);
+@@ -206,6 +224,7 @@ public class QuickSpaceView extends FrameLayout implements OnDataListener {
+     }
+ 
+     private void prepareLayout(boolean useAlternativeQuickspaceUI) {
++        mIsAlternateStyle = useAlternativeQuickspaceUI;
+         int indexOfChild = indexOfChild(mQuickspaceContent);
+         removeView(mQuickspaceContent);
+         if (useAlternativeQuickspaceUI) {
+@@ -226,6 +245,34 @@ public class QuickSpaceView extends FrameLayout implements OnDataListener {
+         }
+     }
+ 
++    private void animateIn(View view) {
++        if (view.getVisibility() == View.VISIBLE && view.getAlpha() == 1f) {
++            return; // Already visible
++        }
++        view.setVisibility(View.VISIBLE);
++        view.setAlpha(0f);
++        view.setTranslationY(view.getHeight() / 2f);
++        view.animate()
++            .alpha(1f)
++            .translationY(0f)
++            .setDuration(300)
++            .setInterpolator(new DecelerateInterpolator())
++            .start();
++    }
++
++    private void animateOut(View view) {
++        if (view.getVisibility() != View.VISIBLE) {
++            return; // Already hidden
++        }
++        view.animate()
++            .alpha(0f)
++            .translationY(view.getHeight() / 2f)
++            .setDuration(400)
++            .setInterpolator(new AccelerateInterpolator())
++            .withEndAction(() -> view.setVisibility(View.GONE))
++            .start();
++    }
++
+     @Override
+     public void onAttachedToWindow() {
+         super.onAttachedToWindow();
+diff --git a/src/com/android/launcher3/quickspace/QuickspaceController.java b/src/com/android/launcher3/quickspace/QuickspaceController.java
+index cb424315f1..20e5b06fef 100644
+--- a/src/com/android/launcher3/quickspace/QuickspaceController.java
++++ b/src/com/android/launcher3/quickspace/QuickspaceController.java
+@@ -223,9 +223,6 @@ public class QuickspaceController implements OmniJawsClient.OmniJawsObserver,
+     }
+ 
+     private void cancelListeners() {
+-        if (mEventsController != null) {
+-            mEventsController.onPause();
+-        }
+         for (OnDataListener listener : new ArrayList<>(mListeners)) {
+             removeListener(listener);
+         }
+-- 
+2.54.0
+

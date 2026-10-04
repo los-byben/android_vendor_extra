@@ -1,0 +1,30 @@
+From ebbe4220a5c22b1fe247e9fe7d226968fd6c8c3b Mon Sep 17 00:00:00 2001
+From: Byben <heybyben@gmail.com>
+Date: Sun, 4 Oct 2026 14:24:32 +0700
+Subject: [PATCH] core: Rename crdroid util package to custom
+
+Change-Id: Ief574004ace627e1ce457a0e77abc780055a38c4
+---
+ .../internal/util/{crdroid => custom}/OmniJawsClient.java       | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+ rename core/java/com/android/internal/util/{crdroid => custom}/OmniJawsClient.java (99%)
+
+diff --git a/core/java/com/android/internal/util/crdroid/OmniJawsClient.java b/core/java/com/android/internal/util/custom/OmniJawsClient.java
+similarity index 99%
+rename from core/java/com/android/internal/util/crdroid/OmniJawsClient.java
+rename to core/java/com/android/internal/util/custom/OmniJawsClient.java
+index 1d2564498..627484ff5 100644
+--- a/core/java/com/android/internal/util/crdroid/OmniJawsClient.java
++++ b/core/java/com/android/internal/util/custom/OmniJawsClient.java
+@@ -15,7 +15,7 @@
+  * limitations under the License.
+  */
+ 
+-package com.android.internal.util.crdroid;
++package com.android.internal.util.custom;
+ 
+ import android.content.BroadcastReceiver;
+ import android.content.Context;
+-- 
+2.54.0
+

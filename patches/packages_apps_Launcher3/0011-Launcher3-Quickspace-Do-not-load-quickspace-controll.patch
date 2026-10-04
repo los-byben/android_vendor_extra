@@ -1,0 +1,123 @@
+From caeeb730677b99e231e4e8bc1768f7aa3afd4470 Mon Sep 17 00:00:00 2001
+From: Pranav Vashi <neobuddy89@gmail.com>
+Date: Wed, 17 Sep 2025 08:17:20 +0530
+Subject: [PATCH 11/32] Launcher3: Quickspace: Do not load quickspace
+ controller if disabled
+
+Ref: https://github.com/crdroidandroid/issue_tracker/issues/785
+Signed-off-by: Pranav Vashi <neobuddy89@gmail.com>
+---
+ src/com/android/launcher3/Launcher.java       |  3 +++
+ .../launcher3/quickspace/QuickSpaceView.java  | 26 +++++++++++--------
+ 2 files changed, 18 insertions(+), 11 deletions(-)
+
+diff --git a/src/com/android/launcher3/Launcher.java b/src/com/android/launcher3/Launcher.java
+index f2851ef68f..98a306be05 100644
+--- a/src/com/android/launcher3/Launcher.java
++++ b/src/com/android/launcher3/Launcher.java
+@@ -1217,6 +1217,9 @@ public class Launcher extends StatefulActivity<LauncherState>
+ 
+         // QuickSpace
+         mQuickSpace = findViewById(R.id.reserved_container_workspace);
++        if (!LauncherPrefs.SHOW_QUICKSPACE.get(this) && mQuickSpace != null) {
++            mQuickSpace.setVisibility(View.GONE);
++        }
+ 
+         // Setup the drag controller (drop targets have to be added in reverse order in priority)
+         mDropTargetBar.setup(mDragController);
+diff --git a/src/com/android/launcher3/quickspace/QuickSpaceView.java b/src/com/android/launcher3/quickspace/QuickSpaceView.java
+index 0fc00979f8..066d5ba809 100644
+--- a/src/com/android/launcher3/quickspace/QuickSpaceView.java
++++ b/src/com/android/launcher3/quickspace/QuickSpaceView.java
+@@ -43,8 +43,8 @@ public class QuickSpaceView extends FrameLayout implements OnDataListener {
+     private static final String TAG = "Launcher3:QuickSpaceView";
+     private static final boolean DEBUG = false;
+ 
+-    public final ColorStateList mColorStateList;
+-    public final int mQuickspaceBackgroundRes;
++    public ColorStateList mColorStateList;
++    public int mQuickspaceBackgroundRes;
+ 
+     public ViewGroup mQuickspaceContent;
+     public ImageView mEventSubIcon;
+@@ -69,6 +69,7 @@ public class QuickSpaceView extends FrameLayout implements OnDataListener {
+ 
+     public QuickSpaceView(Context context, AttributeSet set) {
+         super(context, set);
++        if (!LauncherPrefs.SHOW_QUICKSPACE.get(context)) return;
+         mController = new QuickspaceController(context);
+         mColorStateList = ColorStateList.valueOf(Themes.getAttrColor(getContext(), R.attr.workspaceTextColor));
+         mQuickspaceBackgroundRes = R.drawable.bg_quickspace;
+@@ -77,6 +78,7 @@ public class QuickSpaceView extends FrameLayout implements OnDataListener {
+ 
+     @Override
+     public void onDataUpdated() {
++        if (mController == null) return;
+         boolean altUI = LauncherPrefs.SHOW_QUICKSPACE_ALT.get(getContext());
+         if (mEventTitle == null || mIsAlternateStyle != altUI) {
+             prepareLayout(altUI);
+@@ -87,7 +89,6 @@ public class QuickSpaceView extends FrameLayout implements OnDataListener {
+     }
+ 
+     private final void loadDoubleLine(boolean useAlternativeQuickspaceUI) {
+-        setBackgroundResource(mQuickspaceBackgroundRes);
+         mEventTitle.setText(mController.getEventController().getTitle());
+         if (useAlternativeQuickspaceUI) {
+             String greetingsExt = mController.getEventController().getGreetings();
+@@ -260,6 +261,7 @@ public class QuickSpaceView extends FrameLayout implements OnDataListener {
+ 
+         loadViews();
+         getQuickSpaceView();
++        setBackgroundResource(mQuickspaceBackgroundRes);
+     }
+ 
+     private void getQuickSpaceView() {
+@@ -312,35 +314,37 @@ public class QuickSpaceView extends FrameLayout implements OnDataListener {
+ 
+     @Override
+     public void onDetachedFromWindow() {
++        if (mController == null) return;
+         clearOldViewState();
++        setBackground(null);
+         super.onDetachedFromWindow();
+-        if (mController != null) {
+-            mController.onPause();
+-            mController.removeListener(this);
+-            mListenerRegistered = false;
+-        }
++        mController.onPause();
++        mController.removeListener(this);
++        mListenerRegistered = false;
+     }
+ 
+     @Override
+     public void onFinishInflate() {
+         super.onFinishInflate();
++        if (mController == null) return;
+         loadViews();
+         mFinishedInflate = true;
+-        if (mController != null && isAttachedToWindow() && !mListenerRegistered) {
++        if (isAttachedToWindow() && !mListenerRegistered) {
+             mController.addListener(this);
+             mListenerRegistered = true;
+         }
+     }
+ 
+     public void onPause() {
+-        mController.onPause();
++        if (mController != null) mController.onPause();
+     }
+ 
+     public void onResume() {
+-        if (mListenerRegistered) mController.onResume();
++        if (mController != null && mListenerRegistered) mController.onResume();
+     }
+ 
+     public void onDestroy() {
++        if (mController == null) return;
+         mController.onDestroy();
+         mController = null;
+         mQuickspaceContent = null;
+-- 
+2.54.0
+

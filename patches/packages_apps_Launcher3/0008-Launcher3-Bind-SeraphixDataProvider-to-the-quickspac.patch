@@ -1,0 +1,351 @@
+From 03e5ece9c3153bb03a18918758b8599ca1a37fcc Mon Sep 17 00:00:00 2001
+From: Nauval Rizky <enuma.alrizky@gmail.com>
+Date: Sun, 4 Oct 2026 11:24:44 +0700
+Subject: [PATCH 08/32] Launcher3: Bind SeraphixDataProvider to the quickspace
+
+(cherry picked from commit aa3075b87c60abfb70d99e62bbb48705bdbf8091)
+
+Adapt to Lineage:
+- LauncherPrefs: only SERAPHIX_HOLDER_ID + WEATHER_PROVIDER keys
+- cr_strings: only provider strings; skip old settings UI
+  (LOS uses new prefs structure)
+
+Change-Id: I2a1395659b7a787224503b36683643a4c2a9d6e7
+---
+ res/values/cr_arrays.xml                      |  30 ++++
+ res/values/cr_strings.xml                     |   8 +-
+ src/com/android/launcher3/LauncherPrefs.kt    |   2 +
+ .../launcher3/quickspace/QuickSpaceView.java  |   4 +-
+ .../quickspace/QuickspaceController.java      | 161 ++++++++++++++++--
+ 5 files changed, 184 insertions(+), 21 deletions(-)
+ create mode 100644 res/values/cr_arrays.xml
+
+diff --git a/res/values/cr_arrays.xml b/res/values/cr_arrays.xml
+new file mode 100644
+index 0000000000..d33327ac7c
+--- /dev/null
++++ b/res/values/cr_arrays.xml
+@@ -0,0 +1,30 @@
++<?xml version="1.0" encoding="utf-8"?>
++<!--
++     Copyright (C) 2016-2025 crDroid Android Project
++
++     Licensed under the Apache License, Version 2.0 (the "License");
++     you may not use this file except in compliance with the License.
++     You may obtain a copy of the License at
++
++          http://www.apache.org/licenses/LICENSE-2.0
++
++     Unless required by applicable law or agreed to in writing, software
++     distributed under the License is distributed on an "AS IS" BASIS,
++     WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++     See the License for the specific language governing permissions and
++     limitations under the License.
++-->
++<resources>
++
++    <string-array name="quickspace_weather_provider_entries">
++        <item>@string/quickspace_weather_provider_entry_auto</item>
++        <item>@string/quickspace_weather_provider_entry_seraphix</item>
++        <item>@string/quickspace_weather_provider_entry_omnijaws</item>
++    </string-array>
++
++    <string-array name="quickspace_weather_provider_values">
++        <item>auto</item>
++        <item>seraphix</item>
++        <item>omnijaws</item>
++    </string-array>
++</resources>
+diff --git a/res/values/cr_strings.xml b/res/values/cr_strings.xml
+index 66873a4962..b85e5c0a64 100644
+--- a/res/values/cr_strings.xml
++++ b/res/values/cr_strings.xml
+@@ -28,5 +28,9 @@
+    <!-- QuickSpace: QuickEvent: Greetings -->
+        <string name="quickspace_grt_morning">Good morning.</string>
+    <string name="quickspace_grt_night">Good night.</string>
+-
+-</resources>
+\ No newline at end of file
++    <!-- QuickSpace: Weather provider -->
++    <string name="quickspace_weather_provider_title">Weather provider</string>
++    <string name="quickspace_weather_provider_entry_auto">Auto</string>
++    <string name="quickspace_weather_provider_entry_seraphix">Google Smartspace</string>
++    <string name="quickspace_weather_provider_entry_omnijaws">OmniJaws</string>
++</resources>
+diff --git a/src/com/android/launcher3/LauncherPrefs.kt b/src/com/android/launcher3/LauncherPrefs.kt
+index a6f85373dd..6828351500 100644
+--- a/src/com/android/launcher3/LauncherPrefs.kt
++++ b/src/com/android/launcher3/LauncherPrefs.kt
+@@ -277,12 +277,14 @@ constructor(@ApplicationContext private val encryptedContext: Context) {
+         val HOTSEAT_COUNT =
+             backedUpItem(DeviceGridState.KEY_HOTSEAT_COUNT, -1, EncryptionType.ENCRYPTED)
+         // QuickSpace
++        @JvmField val SERAPHIX_HOLDER_ID = backedUpItem("pref_seraphix_holder_id", -1)
+         @JvmField val SHOW_QUICKSPACE = backedUpItem("pref_quickspace", true)
+         @JvmField val SHOW_QUICKSPACE_ALT = backedUpItem("pref_quickspace_alt", false)
+         @JvmField val SHOW_QUICKSPACE_PSONALITY = backedUpItem("pref_quickspace_psonality", true)
+         @JvmField val SHOW_QUICKSPACE_NOWPLAYING = backedUpItem("pref_quickspace_np", true)
+         @JvmField val SHOW_QUICKSPACE_WEATHER = backedUpItem("pref_quickspace_weather", true)
+         @JvmField val SHOW_QUICKSPACE_WEATHER_CITY = backedUpItem("pref_quickspace_weather_city", false)
++        @JvmField val SHOW_QUICKSPACE_WEATHER_PROVIDER = backedUpItem("pref_quickspace_weather_provider", "auto")
+         @JvmField val SHOW_QUICKSPACE_WEATHER_TEXT = backedUpItem("pref_quickspace_weather_text", true)
+         @JvmField
+         val TASKBAR_PINNING =
+diff --git a/src/com/android/launcher3/quickspace/QuickSpaceView.java b/src/com/android/launcher3/quickspace/QuickSpaceView.java
+index 17069a6ad3..2dc52cf275 100644
+--- a/src/com/android/launcher3/quickspace/QuickSpaceView.java
++++ b/src/com/android/launcher3/quickspace/QuickSpaceView.java
+@@ -195,8 +195,10 @@ public class QuickSpaceView extends FrameLayout implements OnDataListener {
+         container.setOnClickListener(QuickSpaceActionReceiver.getWeatherAction());
+         title.setText(weatherTemp);
+         title.setOnClickListener(QuickSpaceActionReceiver.getWeatherAction());
+-        icon.setImageDrawable(mController.getWeatherIcon());
++        Drawable d = mController.getWeatherIcon();
++        icon.setImageDrawable(d);
+         icon.setOnClickListener(QuickSpaceActionReceiver.getWeatherAction());
++        icon.setVisibility(d != null ? View.VISIBLE : View.GONE);
+     }
+ 
+     private final void loadViews() {
+diff --git a/src/com/android/launcher3/quickspace/QuickspaceController.java b/src/com/android/launcher3/quickspace/QuickspaceController.java
+index d78ff082b2..b84a7ad33a 100644
+--- a/src/com/android/launcher3/quickspace/QuickspaceController.java
++++ b/src/com/android/launcher3/quickspace/QuickspaceController.java
+@@ -19,6 +19,7 @@ import static com.android.launcher3.util.Executors.MAIN_EXECUTOR;
+ 
+ import android.annotation.NonNull;
+ import android.content.Context;
++import android.graphics.Bitmap;
+ import android.graphics.drawable.Drawable;
+ import android.graphics.drawable.Icon;
+ import android.os.Handler;
+@@ -38,6 +39,9 @@ import com.android.launcher3.util.PackageUserKey;
+ import com.android.launcher3.util.MediaSessionManagerHelper;
+ import com.android.launcher3.util.MSMHProxy;
+ 
++import io.chaldeaprjkt.seraphixgoogle.SeraphixDataProvider;
++import io.chaldeaprjkt.seraphixgoogle.DataProviderListener;
++
+ import java.util.ArrayList;
+ import java.util.Collections;
+ import java.util.HashMap;
+@@ -64,6 +68,13 @@ public class QuickspaceController implements OmniJawsClient.OmniJawsObserver,
+ 
+     private final Handler mHandler = MAIN_EXECUTOR.getHandler();
+ 
++    private enum WeatherProvider { OMNIJAWS, SERAPHIX }
++    private WeatherProvider mProvider;
++
++    private SeraphixDataProvider mSeraphix;
++    private String mSeraphixText;
++    private Icon mSeraphixIcon;
++
+     private final Runnable mOnDataUpdatedRunnable = new Runnable() {
+             @Override
+             public void run() {
+@@ -111,7 +122,59 @@ public class QuickspaceController implements OmniJawsClient.OmniJawsObserver,
+         mEventsController = new QuickEventsController(context);
+     }
+ 
+-    private void addWeatherProvider() {
++    private void decideWeatherProvider() {
++        String pref = LauncherPrefs.SHOW_QUICKSPACE_WEATHER_PROVIDER.get(mContext);
++        WeatherProvider target = WeatherProvider.SERAPHIX;
++        if ("seraphix".equals(pref)) {
++            target = WeatherProvider.SERAPHIX;
++        } else if ("auto".equals(pref)) {
++            // Try seraphix first; if bind fails, fall back to OmniJaws
++            if (tryBindSeraphix(true)) {
++                target = WeatherProvider.SERAPHIX;
++            } else {
++                target = WeatherProvider.OMNIJAWS;
++            }
++        } else if ("omnijaws".equals(pref)) {
++            target = WeatherProvider.OMNIJAWS;
++        }
++        switchProvider(target);
++    }
++
++    private void switchProvider(WeatherProvider target) {
++        if (mProvider == target) {
++            // Ensure the chosen provider is actually set up
++            if (target == WeatherProvider.SERAPHIX) {
++                tryBindSeraphix(false);
++            } else {
++                addOmniJawsIfEnabled();
++            }
++            return;
++        }
++
++        // Tear down old
++        if (mProvider == WeatherProvider.SERAPHIX) {
++            unbindSeraphix();
++        } else if (mProvider == WeatherProvider.OMNIJAWS) {
++            removeOmniIfRegistered();
++        }
++
++        mProvider = target;
++
++        // Bring up new
++        if (mProvider == WeatherProvider.SERAPHIX) {
++            if (!tryBindSeraphix(false)) {
++                // fallback if bind fails at runtime
++                mProvider = WeatherProvider.OMNIJAWS;
++                addOmniJawsIfEnabled();
++            }
++        } else {
++            addOmniJawsIfEnabled();
++        }
++
++        notifyListeners();
++    }
++
++    private void addOmniJawsIfEnabled() {
+         if (!LauncherPrefs.SHOW_QUICKSPACE_WEATHER.get(mContext)) return;
+         if (mWeatherClient == null) mWeatherClient = OmniJawsClient.get();
+         if (!mOmniRegistered) {
+@@ -121,6 +184,50 @@ public class QuickspaceController implements OmniJawsClient.OmniJawsObserver,
+         queryAndUpdateWeather();
+     }
+ 
++    private boolean tryBindSeraphix(boolean silent) {
++        try {
++            if (mSeraphix == null) {
++                mSeraphix = new SeraphixDataProvider(mContext, 1022,
++                    LauncherPrefs.SERAPHIX_HOLDER_ID.get(mContext));
++                mSeraphix.setOnDataUpdated(mSeraphixListener);
++            }
++            mSeraphix.bind(id -> {
++                LauncherPrefs.get(mContext).put(LauncherPrefs.SERAPHIX_HOLDER_ID, id);
++            });
++            return true;
++        } catch (Throwable t) {
++            if (!silent) Log.w(TAG, "Seraphix bind failed, falling back", t);
++            unbindSeraphix();
++            return false;
++        }
++    }
++
++    private void unbindSeraphix() {
++        try {
++            if (mSeraphix != null) {
++                mSeraphix.setOnDataUpdated(null);
++                mSeraphix.unbind();
++            }
++        } catch (Throwable ignored) {}
++        mSeraphix = null;
++        mSeraphixText = null;
++        mSeraphixIcon = null;
++    }
++
++    private final DataProviderListener mSeraphixListener = card -> {
++        try {
++            updateWeatherData(card.getText(), card.getImage());
++        } catch (Exception e) {
++            Log.e(TAG, "Seraphix update error", e);
++        }
++    };
++
++    private void updateWeatherData(String text, Bitmap image) {
++        mSeraphixText = text;
++        mSeraphixIcon = image == null ? null : Icon.createWithBitmap(image);
++        notifyListeners();
++    }
++
+     public void addListener(OnDataListener listener) {
+         if (listener == null) return;
+         boolean wasEmpty = mListeners.isEmpty();
+@@ -128,7 +235,7 @@ public class QuickspaceController implements OmniJawsClient.OmniJawsObserver,
+             mListeners.add(listener);
+         }
+         if (wasEmpty) {
+-            addWeatherProvider();
++            decideWeatherProvider();
+             registerMediaController();
+             mEventsController.initQuickEvents();
+             mHandler.post(mPsaRunnable);
+@@ -150,7 +257,11 @@ public class QuickspaceController implements OmniJawsClient.OmniJawsObserver,
+         if (listener == null) return;
+         mListeners.remove(listener);
+         if (mListeners.isEmpty()) {
+-            removeOmniIfRegistered();
++            if (mProvider == WeatherProvider.OMNIJAWS) {
++                removeOmniIfRegistered();
++            } else {
++                unbindSeraphix();
++            }
+             unregisterMediaController();
+             mHandler.removeCallbacks(mPsaRunnable);
+             mHandler.removeCallbacks(mWeatherRunnable);
+@@ -167,31 +278,44 @@ public class QuickspaceController implements OmniJawsClient.OmniJawsObserver,
+     }
+ 
+     public boolean isWeatherAvailable() {
+-        return mWeatherClient != null && mWeatherClient.isOmniJawsEnabled(mContext);
++        if (!LauncherPrefs.SHOW_QUICKSPACE_WEATHER.get(mContext)) return false;
++        if (mProvider == WeatherProvider.SERAPHIX) {
++            return !TextUtils.isEmpty(mSeraphixText) || mSeraphixIcon != null;
++        } else {
++            return mWeatherClient != null && mWeatherClient.isOmniJawsEnabled(mContext);
++        }
+     }
+ 
+     public Drawable getWeatherIcon() {
+-        return mConditionImage;
++        if (mProvider == WeatherProvider.SERAPHIX) {
++            return mSeraphixIcon != null ? mSeraphixIcon.loadDrawable(mContext) : null;
++        } else {
++            return mConditionImage;
++        }
+     }
+ 
+     public String getWeatherTemp() {
+-        if (mWeatherInfo == null) return null;
++        if (mProvider == WeatherProvider.SERAPHIX) {
++            return mSeraphixText;
++        } else {
++            if (mWeatherInfo == null) return null;
+ 
+-        boolean shouldShowCity = LauncherPrefs.SHOW_QUICKSPACE_WEATHER_CITY.get(mContext);
+-        boolean showWeatherText = LauncherPrefs.SHOW_QUICKSPACE_WEATHER_TEXT.get(mContext);
++            boolean shouldShowCity = LauncherPrefs.SHOW_QUICKSPACE_WEATHER_CITY.get(mContext);
++            boolean showWeatherText = LauncherPrefs.SHOW_QUICKSPACE_WEATHER_TEXT.get(mContext);
+ 
+-        StringBuilder weatherTemp = new StringBuilder();
+-        if (shouldShowCity) {
+-            weatherTemp.append(mWeatherInfo.city).append(" ");
+-        }
+-        weatherTemp.append(mWeatherInfo.temp)
+-                   .append(mWeatherInfo.tempUnits);
++            StringBuilder weatherTemp = new StringBuilder();
++            if (shouldShowCity) {
++                weatherTemp.append(mWeatherInfo.city).append(" ");
++            }
++            weatherTemp.append(mWeatherInfo.temp)
++                       .append(mWeatherInfo.tempUnits);
+ 
+-        if (showWeatherText) {
+-            weatherTemp.append(" • ").append(getConditionText(mWeatherInfo.condition));
+-        }
++            if (showWeatherText) {
++                weatherTemp.append(" • ").append(getConditionText(mWeatherInfo.condition));
++            }
+ 
+-        return weatherTemp.toString();
++            return weatherTemp.toString();
++        }
+     }
+ 
+     private String getConditionText(String input) {
+@@ -248,6 +372,7 @@ public class QuickspaceController implements OmniJawsClient.OmniJawsObserver,
+     public void onResume() {
+         registerMediaController();
+         updateMediaController();
++        decideWeatherProvider();
+         mHandler.post(mPsaRunnable);
+         notifyListeners();
+     }
+-- 
+2.54.0
+

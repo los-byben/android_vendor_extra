@@ -1,0 +1,210 @@
+From 870aa4d6b237e2da92080228eb66adb12301743f Mon Sep 17 00:00:00 2001
+From: Dmitrii <bankersenator@gmail.com>
+Date: Sun, 3 Aug 2025 21:46:36 +0000
+Subject: [PATCH 03/32] Launcher3: QuickSpace: Refactor to fix event update
+ loops
+
+Refactored the QuickSpace update logic to prevent feedback loops that caused random messages to flicker or switch constantly.
+The time-based message updates are now handled separately from other events like media playback, fixing the instability.
+
+Squashed:
+
+    From: Dmitrii <bankersenator@gmail.com>
+    Date: Wed, 6 Aug 2025 16:32:24 +0000
+    Subject: Launcher3: QuickSpace: Fix default date and message display
+
+    Signed-off-by: Dmitrii <bankersenator@gmail.com>
+    Signed-off-by: Pranav Vashi <neobuddy89@gmail.com>
+
+    From: Pranav Vashi <neobuddy89@gmail.com>
+    Date: Thu, 7 Aug 2025 07:04:31 +0530
+    Subject: Launcher3: Reuse handler for QuickSpace events
+
+    Signed-off-by: Pranav Vashi <neobuddy89@gmail.com>
+
+Signed-off-by: Dmitrii <bankersenator@gmail.com>
+Signed-off-by: Pranav Vashi <neobuddy89@gmail.com>
+---
+ .../quickspace/QuickEventsController.java     | 38 ++-----------------
+ .../launcher3/quickspace/QuickSpaceView.java  |  1 -
+ .../quickspace/QuickspaceController.java      | 27 ++++++++++---
+ 3 files changed, 26 insertions(+), 40 deletions(-)
+
+diff --git a/src/com/android/launcher3/quickspace/QuickEventsController.java b/src/com/android/launcher3/quickspace/QuickEventsController.java
+index 6544189177..ce5dd17ef4 100644
+--- a/src/com/android/launcher3/quickspace/QuickEventsController.java
++++ b/src/com/android/launcher3/quickspace/QuickEventsController.java
+@@ -70,18 +70,11 @@ public class QuickEventsController {
+     private Drawable mEventSubIcon = null;
+ 
+     private boolean mIsQuickEvent = false;
+-    private boolean mRegistered = false;
+ 
+     private final Map<Integer, String[]> mCachedPSAMap = new HashMap<>();
+ 
+     // PSA + Personality
+     private String[] mPSAStr;
+-    private BroadcastReceiver mPSAListener = new BroadcastReceiver() {
+-        @Override
+-        public void onReceive(Context context, Intent intent) {
+-            psonalityEvent();
+-        }
+-    };
+ 
+     // NowPlaying
+     private boolean mEventNowPlaying = false;
+@@ -92,37 +85,22 @@ public class QuickEventsController {
+     public QuickEventsController(Context context) {
+         mContext = context;
+         mResources = context.getResources();
+-        initQuickEvents();
+     }
+ 
+     public void initQuickEvents() {
+-        registerPSAListener();
+         updateQuickEvents();
+     }
+ 
+-    private void registerPSAListener() {
+-        if (mRegistered) return;
+-        mRegistered = true;
+-        IntentFilter psonalityIntent = new IntentFilter();
+-        psonalityIntent.addAction(Intent.ACTION_TIME_TICK);
+-        psonalityIntent.addAction(Intent.ACTION_TIME_CHANGED);
+-        psonalityIntent.addAction(Intent.ACTION_TIMEZONE_CHANGED);
+-        mContext.registerReceiver(mPSAListener, psonalityIntent, Context.RECEIVER_NOT_EXPORTED);
+-    }
+-
+-    private void unregisterPSAListener() {
+-        if (!mRegistered) return;
+-        mRegistered = false;
+-        mContext.unregisterReceiver(mPSAListener);
+-    }
+-
+     public void updateQuickEvents() {
+-        if (!mRegistered) return;
+         nowPlayingEvent();
+         initNowPlayingEvent();
+         psonalityEvent();
+     }
+ 
++    public void updatePsonality() {
++        psonalityEvent();
++    }
++
+     private void nowPlayingEvent() {
+         if (mEventNowPlaying && !mPlayingActive) {
+             mIsQuickEvent = false;
+@@ -312,14 +290,6 @@ public class QuickEventsController {
+         return mPlayingActive;
+     }
+ 
+-    public void onPause() {
+-        unregisterPSAListener();
+-    }
+-
+-    public void onResume() {
+-        registerPSAListener();
+-    }
+-
+     private String[] getCachedArray(int resId) {
+         if (!mCachedPSAMap.containsKey(resId)) {
+             mCachedPSAMap.put(resId, mResources.getStringArray(resId));
+diff --git a/src/com/android/launcher3/quickspace/QuickSpaceView.java b/src/com/android/launcher3/quickspace/QuickSpaceView.java
+index c5dc1b6da3..df3ea2fc20 100644
+--- a/src/com/android/launcher3/quickspace/QuickSpaceView.java
++++ b/src/com/android/launcher3/quickspace/QuickSpaceView.java
+@@ -80,7 +80,6 @@ public class QuickSpaceView extends FrameLayout implements OnDataListener {
+     @Override
+     public void onDataUpdated() {
+         boolean altUI = LauncherPrefs.SHOW_QUICKSPACE_ALT.get(getContext());
+-        mController.getEventController().initQuickEvents();
+         mIsQuickEvent = mController.isQuickEvent();
+         if (mEventTitle == null || (altUI && mGreetingsExt == null)) {
+             prepareLayout(altUI);
+diff --git a/src/com/android/launcher3/quickspace/QuickspaceController.java b/src/com/android/launcher3/quickspace/QuickspaceController.java
+index 5a704d81d0..cb424315f1 100644
+--- a/src/com/android/launcher3/quickspace/QuickspaceController.java
++++ b/src/com/android/launcher3/quickspace/QuickspaceController.java
+@@ -21,6 +21,7 @@ import android.annotation.NonNull;
+ import android.content.Context;
+ import android.graphics.drawable.Drawable;
+ import android.graphics.drawable.Icon;
++import android.os.Handler;
+ import android.media.MediaMetadata;
+ import android.media.session.MediaController;
+ import android.media.session.MediaSession;
+@@ -58,6 +59,11 @@ public class QuickspaceController implements OmniJawsClient.OmniJawsObserver,
+     private OmniJawsClient.WeatherInfo mWeatherInfo;
+     private Drawable mConditionImage;
+ 
++    private static final long PSA_UPDATE_DELAY_MS = 3 * 60 * 1000;
++
++    private final Handler mHandler = MAIN_EXECUTOR.getHandler();
++    private final Runnable mPsaRunnable;
++
+     private Runnable mOnDataUpdatedRunnable = new Runnable() {
+             @Override
+             public void run() {
+@@ -92,6 +98,17 @@ public class QuickspaceController implements OmniJawsClient.OmniJawsObserver,
+         mConditionMap = initializeConditionMap();
+         mEventsController = new QuickEventsController(context);
+         mWeatherClient = OmniJawsClient.get();
++
++        mPsaRunnable = new Runnable() {
++            @Override
++            public void run() {
++                if (mEventsController != null) {
++                    mEventsController.updatePsonality();
++                    notifyListeners();
++                }
++                mHandler.postDelayed(this, PSA_UPDATE_DELAY_MS);
++            }
++        };
+     }
+ 
+     private void addWeatherProvider() {
+@@ -104,6 +121,8 @@ public class QuickspaceController implements OmniJawsClient.OmniJawsObserver,
+         mListeners.add(listener);
+         addWeatherProvider();
+         MSMHProxy.INSTANCE(mContext).addMediaMetadataListener(this);
++        mEventsController.initQuickEvents();
++        mHandler.post(mPsaRunnable);
+         listener.onDataUpdated();
+     }
+ 
+@@ -199,7 +218,6 @@ public class QuickspaceController implements OmniJawsClient.OmniJawsObserver,
+     }
+ 
+     public void onResume() {
+-        mEventsController.onResume();
+         updateMediaController();
+         notifyListeners();
+     }
+@@ -216,6 +234,7 @@ public class QuickspaceController implements OmniJawsClient.OmniJawsObserver,
+ 
+     public void onDestroy() {
+         cancelListeners();
++        mHandler.removeCallbacks(mPsaRunnable);
+         mWeatherClient = null;
+         mWeatherInfo = null;
+         mConditionImage = null;
+@@ -242,13 +261,11 @@ public class QuickspaceController implements OmniJawsClient.OmniJawsObserver,
+     }
+ 
+     private void queryAndUpdateWeather() {
+-        MAIN_EXECUTOR.execute(mWeatherRunnable);
++        mHandler.post(mWeatherRunnable);
+     }
+ 
+     public void notifyListeners() {
+-        MAIN_EXECUTOR
+-            .getHandler()
+-            .post(mOnDataUpdatedRunnable);
++        mHandler.post(mOnDataUpdatedRunnable);
+     }
+ 
+     private void unregisterMediaController() {
+-- 
+2.54.0
+

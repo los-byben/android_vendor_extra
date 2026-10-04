@@ -1,0 +1,130 @@
+From d92e51b1ff654c358ebcaeea6222e46f6e369674 Mon Sep 17 00:00:00 2001
+From: Byben <heybyben@gmail.com>
+Date: Sun, 4 Oct 2026 14:22:38 +0700
+Subject: [PATCH 30/32] Launcher3: QuickSpace: merge styles/dimens into stock
+ files
+
+Change-Id: Ia4f1a595fe99128b5ee60d62e6c50b6845f4024b
+---
+ quickstep/res/values/quickspace_dimens.xml | 41 ----------------------
+ res/values/dimens.xml                      |  5 +++
+ res/values/quickspace_styles.xml           | 27 --------------
+ res/values/styles.xml                      |  8 +++++
+ 4 files changed, 13 insertions(+), 68 deletions(-)
+ delete mode 100644 quickstep/res/values/quickspace_dimens.xml
+ delete mode 100644 res/values/quickspace_styles.xml
+
+diff --git a/quickstep/res/values/quickspace_dimens.xml b/quickstep/res/values/quickspace_dimens.xml
+deleted file mode 100644
+index e92b0d3d0a..0000000000
+--- a/quickstep/res/values/quickspace_dimens.xml
++++ /dev/null
+@@ -1,41 +0,0 @@
+-<?xml version="1.0" encoding="utf-8"?>
+-<!--
+-     Copyright (C) 2016-2026 crDroid Android Project
+-
+-     Licensed under the Apache License, Version 2.0 (the "License");
+-     you may not use this file except in compliance with the License.
+-     You may obtain a copy of the License at
+-
+-          http://www.apache.org/licenses/LICENSE-2.0
+-
+-     Unless required by applicable law or agreed to in writing, software
+-     distributed under the License is distributed on an "AS IS" BASIS,
+-     WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+-     See the License for the specific language governing permissions and
+-     limitations under the License.
+--->
+-<resources xmlns:xliff="urn:oasis:names:tc:xliff:document:1.2">
+-
+-    <!-- Additional gesture navbar lengths -->
+-    <dimen name="taskbar_stashed_small_screen_short">72dp</dimen>
+-    <dimen name="taskbar_stashed_small_screen_long">140dp</dimen>
+-    <dimen name="taskbar_stashed_handle_width_short">108dp</dimen>
+-    <dimen name="taskbar_stashed_handle_width_long">300dp</dimen>
+-    <dimen name="bubblebar_stashed_handle_width_short">35dp</dimen>
+-    <dimen name="bubblebar_stashed_handle_width_long">75dp</dimen>
+-
+-    <!-- Additional gesture navbar heights -->
+-    <dimen name="taskbar_stashed_handle_height_smallest">1dp</dimen>
+-    <dimen name="taskbar_stashed_handle_height_smaller">2dp</dimen>
+-    <dimen name="taskbar_stashed_handle_height_small">3dp</dimen>
+-    <dimen name="taskbar_stashed_handle_height_tall">5dp</dimen>
+-
+-    <!-- Meminfo in overview -->
+-    <dimen name="meminfo_claimed_height">16dp</dimen>
+-
+-    <!-- QuickSpace -->
+-    <dimen name="quickspace_title_size">20sp</dimen>
+-    <dimen name="quickspace_subtitle_size">16sp</dimen>
+-    <dimen name="quickspace_alternate_title_size">18sp</dimen>
+-    <dimen name="quickspace_alternate_subtitle_size">16sp</dimen>
+-</resources>
+diff --git a/res/values/dimens.xml b/res/values/dimens.xml
+index 3080030597..2dcfa8bea3 100644
+--- a/res/values/dimens.xml
++++ b/res/values/dimens.xml
+@@ -597,4 +597,9 @@
+     <dimen name="folder_creator_preview_icon_inner_spacing">5dp</dimen>
+     <dimen name="folder_creator_preview_icon_padding_bottom">8dp</dimen>
+     <dimen name="folder_creator_actions_padding">16dp</dimen>
++    <!-- QuickSpace -->
++    <dimen name="quickspace_title_size">20sp</dimen>
++    <dimen name="quickspace_subtitle_size">16sp</dimen>
++    <dimen name="quickspace_alternate_title_size">18sp</dimen>
++    <dimen name="quickspace_alternate_subtitle_size">16sp</dimen>
+ </resources>
+diff --git a/res/values/quickspace_styles.xml b/res/values/quickspace_styles.xml
+deleted file mode 100644
+index 24297f7f79..0000000000
+--- a/res/values/quickspace_styles.xml
++++ /dev/null
+@@ -1,27 +0,0 @@
+-<?xml version="1.0" encoding="utf-8"?>
+-<!--
+-     Copyright (C) 2016-2025 crDroid Android Project
+-
+-     Licensed under the Apache License, Version 2.0 (the "License");
+-     you may not use this file except in compliance with the License.
+-     You may obtain a copy of the License at
+-
+-          http://www.apache.org/licenses/LICENSE-2.0
+-
+-     Unless required by applicable law or agreed to in writing, software
+-     distributed under the License is distributed on an "AS IS" BASIS,
+-     WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+-     See the License for the specific language governing permissions and
+-     limitations under the License.
+--->
+-<resources>
+-
+-    <!-- QuickSpace -->
+-    <style name="QuickSpaceText">
+-        <item name="android:fontFamily">@*android:string/config_headlineFontFamily</item>
+-    </style>
+-
+-    <style name="QuickSpaceSubText">
+-        <item name="android:fontFamily">@*android:string/config_bodyFontFamily</item>
+-    </style>
+-</resources>
+diff --git a/res/values/styles.xml b/res/values/styles.xml
+index aaea321e1f..1fe58268f9 100644
+--- a/res/values/styles.xml
++++ b/res/values/styles.xml
+@@ -581,4 +581,12 @@
+         <item name="android:windowAnimationStyle">@android:style/Animation</item>
+         <item name="android:windowShowWallpaper">false</item>
+     </style>
++    <!-- QuickSpace -->
++    <style name="QuickSpaceText">
++        <item name="android:fontFamily">@*android:string/config_headlineFontFamily</item>
++    </style>
++
++    <style name="QuickSpaceSubText">
++        <item name="android:fontFamily">@*android:string/config_bodyFontFamily</item>
++    </style>
+ </resources>
+-- 
+2.54.0
+

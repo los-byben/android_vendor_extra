@@ -1,0 +1,91 @@
+From 4bf4627b8514226e6beeb54fc33b72ecc28bfae2 Mon Sep 17 00:00:00 2001
+From: Pranav Vashi <neobuddy89@gmail.com>
+Date: Fri, 18 Sep 2026 21:15:10 +0530
+Subject: [PATCH 20/32] Launcher3: Quickspace: Use CopyOnWriteArrayList instead
+ synchronized list
+
+* So listeners can be iterated without copying or locking.
+
+Signed-off-by: Pranav Vashi <neobuddy89@gmail.com>
+---
+ .../quickspace/QuickspaceController.java      | 35 ++++++++++---------
+ 1 file changed, 19 insertions(+), 16 deletions(-)
+
+diff --git a/src/com/android/launcher3/quickspace/QuickspaceController.java b/src/com/android/launcher3/quickspace/QuickspaceController.java
+index c5b78b7d28..90a7fe40a1 100644
+--- a/src/com/android/launcher3/quickspace/QuickspaceController.java
++++ b/src/com/android/launcher3/quickspace/QuickspaceController.java
+@@ -37,20 +37,18 @@ import com.android.launcher3.util.MediaSessionManagerHelper;
+ import io.chaldeaprjkt.seraphixgoogle.SeraphixDataProvider;
+ import io.chaldeaprjkt.seraphixgoogle.DataProviderListener;
+ 
+-import java.util.ArrayList;
+-import java.util.Collections;
+ import java.util.HashMap;
+ import java.util.List;
+ import java.util.Locale;
+ import java.util.Map;
++import java.util.concurrent.CopyOnWriteArrayList;
+ 
+ public class QuickspaceController implements OmniJawsClient.OmniJawsObserver,
+         MediaSessionManagerHelper.MediaMetadataListener {
+ 
+     private static final String TAG = "Launcher3:QuickspaceController";
+ 
+-    private final List<OnDataListener> mListeners =
+-        Collections.synchronizedList(new ArrayList<>());
++    private final List<OnDataListener> mListeners = new CopyOnWriteArrayList<>();
+     private final Context mContext;
+     private final Map<String, Integer> mConditionMap;
+     private QuickEventsController mEventsController;
+@@ -78,30 +76,35 @@ public class QuickspaceController implements OmniJawsClient.OmniJawsObserver,
+     private final Runnable mOnDataUpdatedRunnable = new Runnable() {
+             @Override
+             public void run() {
+-                for (OnDataListener list : new ArrayList<>(mListeners)) {
++                for (OnDataListener list : mListeners) {
+                     list.onDataUpdated();
+                 }
+             }
+         };
+ 
+-    private Runnable mWeatherRunnable = new Runnable() {
++    private final Runnable mWeatherRunnable = new Runnable() {
+             @Override
+             public void run() {
+                 try {
+-                    if (mWeatherClient == null) return;
+-                    mWeatherClient.queryWeather(mContext);
+-                    mWeatherInfo = mWeatherClient.getWeatherInfo();
+-                    if (mWeatherInfo != null) {
+-                        mConditionImage = mWeatherClient.getWeatherConditionImage(mContext, mWeatherInfo.conditionCode);
+-                    }
+-                    notifyListeners();
+-                } catch(Exception e) {
+-                    // Do nothing
++                    final OmniJawsClient client = mWeatherClient;
++                    if (client == null) return;
++                    client.queryWeather(mContext);
++                    final OmniJawsClient.WeatherInfo info = client.getWeatherInfo();
++                    final Drawable image = (info == null) ? null
++                            : client.getWeatherConditionImage(mContext, info.conditionCode);
++                    mHandler.post(() -> {
++                        if (mWeatherClient == null) return;
++                        mWeatherInfo = info;
++                        if (info != null) mConditionImage = image;
++                        notifyListeners();
++                    });
++                } catch (Exception e) {
++                    Log.w(TAG, "weather query failed", e);
+                 }
+             }
+         };
+ 
+-    private Runnable mPsaRunnable = new Runnable() {
++    private final Runnable mPsaRunnable = new Runnable() {
+             @Override
+             public void run() {
+                 mHandler.removeCallbacks(this);
+-- 
+2.54.0
+

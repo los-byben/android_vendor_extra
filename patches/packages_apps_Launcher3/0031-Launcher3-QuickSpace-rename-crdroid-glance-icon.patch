@@ -1,0 +1,32 @@
+From cb1050a6bcd0aa65611a683d6478690685207636 Mon Sep 17 00:00:00 2001
+From: Byben <heybyben@gmail.com>
+Date: Sun, 4 Oct 2026 14:22:53 +0700
+Subject: [PATCH 31/32] Launcher3: QuickSpace: rename crdroid glance icon
+
+Change-Id: Id871c19233dd178573726c6b7188bc0b8e916066
+---
+ .../{ic_quickspace_crdroid.xml => ic_quickspace_glance.xml}     | 0
+ src/com/android/launcher3/quickspace/QuickEventsController.java | 2 +-
+ 2 files changed, 1 insertion(+), 1 deletion(-)
+ rename res/drawable/{ic_quickspace_crdroid.xml => ic_quickspace_glance.xml} (100%)
+
+diff --git a/res/drawable/ic_quickspace_crdroid.xml b/res/drawable/ic_quickspace_glance.xml
+similarity index 100%
+rename from res/drawable/ic_quickspace_crdroid.xml
+rename to res/drawable/ic_quickspace_glance.xml
+diff --git a/src/com/android/launcher3/quickspace/QuickEventsController.java b/src/com/android/launcher3/quickspace/QuickEventsController.java
+index 63a273017f..c31e390df1 100644
+--- a/src/com/android/launcher3/quickspace/QuickEventsController.java
++++ b/src/com/android/launcher3/quickspace/QuickEventsController.java
+@@ -165,7 +165,7 @@ public class QuickEventsController {
+         } else if (luckNumber == 7) {
+             mPSAStr = mResources.getStringArray(R.array.quickspace_psa_random);
+             mEventTitleSub = mPSAStr[getLuckyNumber(0, mPSAStr.length - 1)];
+-            mEventSubIcon = ContextCompat.getDrawable(mContext, R.drawable.ic_quickspace_crdroid);
++            mEventSubIcon = ContextCompat.getDrawable(mContext, R.drawable.ic_quickspace_glance);
+             mIsQuickEvent = true;
+             return;
+         }
+-- 
+2.54.0
+

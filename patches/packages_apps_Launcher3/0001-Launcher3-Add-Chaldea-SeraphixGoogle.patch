@@ -1,0 +1,413 @@
+From f9c6dba79a99699c07a7747a220501bc54973cd8 Mon Sep 17 00:00:00 2001
+From: Nauval Rizky <enuma.alrizky@gmail.com>
+Date: Sun, 4 Oct 2026 11:17:32 +0700
+Subject: [PATCH 01/32] Launcher3: Add Chaldea SeraphixGoogle
+
+(cherry picked from commit 992b43b4d969ded0e1f58ff51618356410cc04e5)
+
+Adapt to Lineage:
+- Only link chaldea.seraphixgoogle lib, skip SettingsLib/commonutils
+  (crDroid-base specifics, not present in this base)
+
+Change-Id: Ia5e3696f28e3bcf6f51100b6771495d537f01588
+---
+ Android.bp                                    |  1 +
+ seraphixgoogle/Android.bp                     | 24 ++++++
+ .../io/chaldeaprjkt/seraphixgoogle/Card.kt    | 20 +++++
+ .../seraphixgoogle/DataProviderBinder.kt      | 20 +++++
+ .../seraphixgoogle/DataProviderListener.kt    | 20 +++++
+ .../EphemeralWidgetHostGoogle.kt              | 35 ++++++++
+ .../EphemeralWidgetHostViewGoogle.kt          | 54 ++++++++++++
+ .../seraphixgoogle/SeraphixCompanion.kt       | 60 +++++++++++++
+ .../seraphixgoogle/SeraphixDataProvider.kt    | 84 +++++++++++++++++++
+ 9 files changed, 318 insertions(+)
+ create mode 100644 seraphixgoogle/Android.bp
+ create mode 100644 seraphixgoogle/src/io/chaldeaprjkt/seraphixgoogle/Card.kt
+ create mode 100644 seraphixgoogle/src/io/chaldeaprjkt/seraphixgoogle/DataProviderBinder.kt
+ create mode 100644 seraphixgoogle/src/io/chaldeaprjkt/seraphixgoogle/DataProviderListener.kt
+ create mode 100644 seraphixgoogle/src/io/chaldeaprjkt/seraphixgoogle/EphemeralWidgetHostGoogle.kt
+ create mode 100644 seraphixgoogle/src/io/chaldeaprjkt/seraphixgoogle/EphemeralWidgetHostViewGoogle.kt
+ create mode 100644 seraphixgoogle/src/io/chaldeaprjkt/seraphixgoogle/SeraphixCompanion.kt
+ create mode 100644 seraphixgoogle/src/io/chaldeaprjkt/seraphixgoogle/SeraphixDataProvider.kt
+
+diff --git a/Android.bp b/Android.bp
+index 72e18b77f4..865815d3e2 100644
+--- a/Android.bp
++++ b/Android.bp
+@@ -335,6 +335,7 @@ android_library {
+         "androidx.compose.ui_ui-tooling",
+         "androidx.navigation_navigation-compose",
+         "cuebarlib",
++        "chaldea.seraphixgoogle",
+     ],
+     manifest: "AndroidManifest-common.xml",
+     sdk_version: "current",
+diff --git a/seraphixgoogle/Android.bp b/seraphixgoogle/Android.bp
+new file mode 100644
+index 0000000000..506d25aab1
+--- /dev/null
++++ b/seraphixgoogle/Android.bp
+@@ -0,0 +1,24 @@
++// Copyright (C) 2021 Chaldeaprjkt
++//
++// Licensed under the Apache License, Version 2.0 (the "License");
++// you may not use this file except in compliance with the License.
++// You may obtain a copy of the License at
++//
++//      http://www.apache.org/licenses/LICENSE-2.0
++//
++// Unless required by applicable law or agreed to in writing, software
++// distributed under the License is distributed on an "AS IS" BASIS,
++// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++// See the License for the specific language governing permissions and
++// limitations under the License.
++
++package {
++    default_applicable_licenses: ["Android-Apache-2.0"],
++}
++
++java_library {
++    name: "chaldea.seraphixgoogle",
++    srcs: ["src/**/*.kt"],
++    sdk_version: "current",
++    min_sdk_version: min_launcher3_sdk_version,
++}
+diff --git a/seraphixgoogle/src/io/chaldeaprjkt/seraphixgoogle/Card.kt b/seraphixgoogle/src/io/chaldeaprjkt/seraphixgoogle/Card.kt
+new file mode 100644
+index 0000000000..3f7a68662a
+--- /dev/null
++++ b/seraphixgoogle/src/io/chaldeaprjkt/seraphixgoogle/Card.kt
+@@ -0,0 +1,20 @@
++/*
++ * Copyright (C) 2021 Chaldeaprjkt
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *      http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++package io.chaldeaprjkt.seraphixgoogle
++
++import android.graphics.Bitmap
++
++data class Card(var text: String? = null, var image: Bitmap? = null)
+diff --git a/seraphixgoogle/src/io/chaldeaprjkt/seraphixgoogle/DataProviderBinder.kt b/seraphixgoogle/src/io/chaldeaprjkt/seraphixgoogle/DataProviderBinder.kt
+new file mode 100644
+index 0000000000..ad163ff362
+--- /dev/null
++++ b/seraphixgoogle/src/io/chaldeaprjkt/seraphixgoogle/DataProviderBinder.kt
+@@ -0,0 +1,20 @@
++/*
++ * Copyright (C) 2021 Chaldeaprjkt
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *      http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++package io.chaldeaprjkt.seraphixgoogle
++
++interface DataProviderBinder {
++    fun onBound(newId: Int)
++}
+diff --git a/seraphixgoogle/src/io/chaldeaprjkt/seraphixgoogle/DataProviderListener.kt b/seraphixgoogle/src/io/chaldeaprjkt/seraphixgoogle/DataProviderListener.kt
+new file mode 100644
+index 0000000000..36e7a60b43
+--- /dev/null
++++ b/seraphixgoogle/src/io/chaldeaprjkt/seraphixgoogle/DataProviderListener.kt
+@@ -0,0 +1,20 @@
++/*
++ * Copyright (C) 2021 Chaldeaprjkt
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *      http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++package io.chaldeaprjkt.seraphixgoogle
++
++interface DataProviderListener {
++    fun onDataUpdated(chip: Card)
++}
+\ No newline at end of file
+diff --git a/seraphixgoogle/src/io/chaldeaprjkt/seraphixgoogle/EphemeralWidgetHostGoogle.kt b/seraphixgoogle/src/io/chaldeaprjkt/seraphixgoogle/EphemeralWidgetHostGoogle.kt
+new file mode 100644
+index 0000000000..59e32adec3
+--- /dev/null
++++ b/seraphixgoogle/src/io/chaldeaprjkt/seraphixgoogle/EphemeralWidgetHostGoogle.kt
+@@ -0,0 +1,35 @@
++/*
++ * Copyright (C) 2021 Chaldeaprjkt
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *      http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++package io.chaldeaprjkt.seraphixgoogle
++
++import android.appwidget.AppWidgetHost
++import android.appwidget.AppWidgetHostView
++import android.appwidget.AppWidgetProviderInfo
++import android.content.Context
++
++class EphemeralWidgetHostGoogle(context: Context, hostId: Int) : AppWidgetHost(context, hostId) {
++    private var listener: DataProviderListener? = null
++
++    override fun onCreateView(
++        context: Context?,
++        appWidgetId: Int,
++        appWidget: AppWidgetProviderInfo?
++    ): AppWidgetHostView = EphemeralWidgetHostViewGoogle(context).setOnUpdateAppWidget(listener)
++
++    fun setOnDataUpdated(listener: DataProviderListener?) {
++        this.listener = listener
++    }
++}
+diff --git a/seraphixgoogle/src/io/chaldeaprjkt/seraphixgoogle/EphemeralWidgetHostViewGoogle.kt b/seraphixgoogle/src/io/chaldeaprjkt/seraphixgoogle/EphemeralWidgetHostViewGoogle.kt
+new file mode 100644
+index 0000000000..c28dec945d
+--- /dev/null
++++ b/seraphixgoogle/src/io/chaldeaprjkt/seraphixgoogle/EphemeralWidgetHostViewGoogle.kt
+@@ -0,0 +1,54 @@
++/*
++ * Copyright (C) 2021 Chaldeaprjkt
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *      http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++package io.chaldeaprjkt.seraphixgoogle
++
++import android.appwidget.AppWidgetHostView
++import android.content.Context
++import android.widget.ImageView
++import android.widget.RemoteViews
++import android.widget.TextView
++import io.chaldeaprjkt.seraphixgoogle.SeraphixCompanion.allChildren
++import io.chaldeaprjkt.seraphixgoogle.SeraphixCompanion.bitmap
++import io.chaldeaprjkt.seraphixgoogle.SeraphixCompanion.string
++import io.chaldeaprjkt.seraphixgoogle.SeraphixCompanion.takeByName
++
++class EphemeralWidgetHostViewGoogle(context: Context?) : AppWidgetHostView(context) {
++    private var listener: DataProviderListener? = null
++
++    override fun updateAppWidget(remoteViews: RemoteViews?) {
++        super.updateAppWidget(remoteViews)
++        val weather = Card()
++        allChildren().forEach {
++            when (it) {
++                is ImageView -> it.takeByName<ImageView>(VID_WEATHER_ICON)
++                    ?.let { x -> weather.image = x.bitmap }
++                is TextView -> it.takeByName<TextView>(VID_WEATHER_TEXT)
++                    ?.let { x -> weather.text = x.string }
++            }
++        }
++        listener?.onDataUpdated(weather)
++    }
++
++    fun setOnUpdateAppWidget(listener: DataProviderListener? = null): EphemeralWidgetHostViewGoogle {
++        this.listener = listener
++        return this
++    }
++
++    companion object {
++        const val VID_WEATHER_TEXT = "title_weather_text"
++        const val VID_WEATHER_ICON = "title_weather_icon"
++    }
++}
+diff --git a/seraphixgoogle/src/io/chaldeaprjkt/seraphixgoogle/SeraphixCompanion.kt b/seraphixgoogle/src/io/chaldeaprjkt/seraphixgoogle/SeraphixCompanion.kt
+new file mode 100644
+index 0000000000..98459dce5a
+--- /dev/null
++++ b/seraphixgoogle/src/io/chaldeaprjkt/seraphixgoogle/SeraphixCompanion.kt
+@@ -0,0 +1,60 @@
++/*
++ * Copyright (C) 2021 Chaldeaprjkt
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *      http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++package io.chaldeaprjkt.seraphixgoogle
++
++import android.content.Context
++import android.content.pm.PackageManager
++import android.content.res.Resources
++import android.graphics.Bitmap
++import android.graphics.drawable.BitmapDrawable
++import android.view.View
++import android.view.ViewGroup
++import android.widget.ImageView
++import android.widget.TextView
++
++
++object SeraphixCompanion {
++    fun Context.isPackageEnabled(packageName: String): Boolean {
++        return try {
++            packageManager.getApplicationInfo(packageName, 0).enabled
++        } catch (e: PackageManager.NameNotFoundException) {
++            false
++        }
++    }
++
++    private fun ViewGroup.allChildren(list: MutableList<View>) {
++        for (i in (0 until childCount)) {
++            val child = getChildAt(i)
++            if (child is ViewGroup) {
++                child.allChildren(list)
++            } else {
++                list.add(child)
++            }
++        }
++    }
++
++    fun ViewGroup.allChildren() = ArrayList<View>().also { allChildren(it) }
++
++    val ImageView.bitmap: Bitmap? get() = (drawable as BitmapDrawable?)?.bitmap
++
++    val TextView.string: String get() = text.toString()
++
++    inline fun <reified T> View.takeByName(name: String): T? = try {
++        takeIf { id != -1 && resources.getResourceEntryName(id) == name } as T?
++    } catch (e: Resources.NotFoundException) {
++        null
++    }
++}
+diff --git a/seraphixgoogle/src/io/chaldeaprjkt/seraphixgoogle/SeraphixDataProvider.kt b/seraphixgoogle/src/io/chaldeaprjkt/seraphixgoogle/SeraphixDataProvider.kt
+new file mode 100644
+index 0000000000..2614394050
+--- /dev/null
++++ b/seraphixgoogle/src/io/chaldeaprjkt/seraphixgoogle/SeraphixDataProvider.kt
+@@ -0,0 +1,84 @@
++/*
++ * Copyright (C) 2021 Chaldeaprjkt
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *      http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++package io.chaldeaprjkt.seraphixgoogle
++
++import android.appwidget.AppWidgetManager
++import android.content.ComponentName
++import android.content.Context
++import android.util.Log
++import io.chaldeaprjkt.seraphixgoogle.SeraphixCompanion.isPackageEnabled
++
++class SeraphixDataProvider(
++    private val context: Context,
++    private val hostId: Int,
++    hostWidgetId: Int = -1
++) {
++    private val widgetManager by lazy { AppWidgetManager.getInstance(context) }
++    private val providerInfo by lazy {
++        widgetManager.installedProviders
++            .firstOrNull { it.provider == smartspaceProviderComponent }
++    }
++    private val widgetHost by lazy { EphemeralWidgetHostGoogle(context, hostId) }
++    private lateinit var widgetHostView: EphemeralWidgetHostViewGoogle
++    private val smartspaceProviderComponent = ComponentName(QSB_PACKAGE, SMARTSPACE_PROVIDER)
++    private var widgetId = hostWidgetId
++    private var isWidgetBound = false
++
++    fun setOnDataUpdated(listener: DataProviderListener? = null): SeraphixDataProvider {
++        widgetHost.setOnDataUpdated(listener)
++        return this
++    }
++
++    fun bind(onBounded: DataProviderBinder? = null) {
++        if (isWidgetBound) return
++        if (!context.isPackageEnabled(QSB_PACKAGE)) {
++            Log.i(TAG, "No $QSB_PACKAGE installed/enabled")
++            return
++        }
++
++        val wInfo = widgetManager.getAppWidgetInfo(widgetId)
++        isWidgetBound = wInfo != null && providerInfo?.provider == wInfo.provider
++        if (!isWidgetBound) {
++            if (widgetId > -1) {
++                widgetHost.deleteHost()
++            }
++            widgetId = widgetHost.allocateAppWidgetId()
++            isWidgetBound =
++                widgetManager.bindAppWidgetIdIfAllowed(widgetId, smartspaceProviderComponent)
++        }
++
++        if (isWidgetBound) {
++            onBounded?.onBound(widgetId)
++            widgetHostView = widgetHost.createView(context, widgetId, providerInfo)
++                    as EphemeralWidgetHostViewGoogle
++            widgetHost.startListening()
++        }
++    }
++
++    fun unbind() {
++        if (!isWidgetBound) return
++        widgetHost.stopListening()
++        widgetHost.deleteHost()
++        isWidgetBound = false
++    }
++
++    companion object {
++        const val TAG = "SeraphixDataProvider"
++        const val SMARTSPACE_PROVIDER =
++            "com.google.android.apps.gsa.staticplugins.smartspace.widget.SmartspaceWidgetProvider"
++        const val QSB_PACKAGE = "com.google.android.googlequicksearchbox"
++    }
++}
+-- 
+2.54.0
+

@@ -1,0 +1,84 @@
+From 555e765383700e5c83ebeb06fd79e703814a75eb Mon Sep 17 00:00:00 2001
+From: Pranav Vashi <neobuddy89@gmail.com>
+Date: Sun, 14 Sep 2025 01:28:25 +0530
+Subject: [PATCH 22/32] Launcher3: Add SeraphixGoogle helpers to pause
+ listening
+
+Signed-off-by: Pranav Vashi <neobuddy89@gmail.com>
+---
+ .../seraphixgoogle/SeraphixDataProvider.kt    | 34 +++++++++++++------
+ 1 file changed, 23 insertions(+), 11 deletions(-)
+
+diff --git a/seraphixgoogle/src/io/chaldeaprjkt/seraphixgoogle/SeraphixDataProvider.kt b/seraphixgoogle/src/io/chaldeaprjkt/seraphixgoogle/SeraphixDataProvider.kt
+index 5d9a0cd2fa..0e99d760cf 100644
+--- a/seraphixgoogle/src/io/chaldeaprjkt/seraphixgoogle/SeraphixDataProvider.kt
++++ b/seraphixgoogle/src/io/chaldeaprjkt/seraphixgoogle/SeraphixDataProvider.kt
+@@ -36,33 +36,42 @@ class SeraphixDataProvider(
+     private val smartspaceProviderComponent = ComponentName(QSB_PACKAGE, SMARTSPACE_PROVIDER)
+     private var widgetId = hostWidgetId
+     private var isWidgetBound = false
++    private var isListening = false
+ 
+     fun setOnDataUpdated(listener: DataProviderListener? = null): SeraphixDataProvider {
+         widgetHost.setOnDataUpdated(listener)
+         return this
+     }
+ 
++    fun pauseListening() {
++        if (isListening) {
++            widgetHost.stopListening()
++            isListening = false
++        }
++    }
++
++    fun resumeListening() {
++        if (isWidgetBound && !isListening) {
++            widgetHost.startListening()
++            isListening = true
++        }
++    }
++
+     fun bind(onBounded: DataProviderBinder? = null) {
+         if (isWidgetBound) return
+-        if (!context.isPackageEnabled(QSB_PACKAGE)) {
+-            Log.i(TAG, "No $QSB_PACKAGE installed/enabled")
+-            return
+-        }
++        if (!context.isPackageEnabled(QSB_PACKAGE)) return
+ 
+         val wInfo = widgetManager.getAppWidgetInfo(widgetId)
+         isWidgetBound = wInfo != null && providerInfo?.provider == wInfo.provider
+         if (!isWidgetBound) {
+-            if (widgetId > -1) {
+-                widgetHost.deleteHost()
+-            }
++            if (widgetId > -1) widgetHost.deleteHost()
+             widgetId = widgetHost.allocateAppWidgetId()
+-            isWidgetBound =
+-                widgetManager.bindAppWidgetIdIfAllowed(widgetId, smartspaceProviderComponent)
++            isWidgetBound = widgetManager.bindAppWidgetIdIfAllowed(widgetId, smartspaceProviderComponent)
+         }
+ 
+         if (isWidgetBound) {
+             onBounded?.onBound(widgetId)
+-            widgetHost.startListening()
++            resumeListening()
+             widgetHostView = widgetHost.createView(context, widgetId, providerInfo)
+                     as EphemeralWidgetHostViewGoogle
+         }
+@@ -70,8 +79,11 @@ class SeraphixDataProvider(
+ 
+     fun unbind() {
+         if (!isWidgetBound) return
+-        widgetHost.stopListening()
++        pauseListening()
+         widgetHost.deleteHost()
++        if (::widgetHostView.isInitialized) {
++            widgetHostView.setOnUpdateAppWidget(null)
++        }
+         isWidgetBound = false
+     }
+ 
+-- 
+2.54.0
+

@@ -1,0 +1,29 @@
+From 271ce0ad805424809b82055e88e3c4ea36d44e94 Mon Sep 17 00:00:00 2001
+From: Byben <heybyben@gmail.com>
+Date: Sun, 4 Oct 2026 11:35:23 +0700
+Subject: [PATCH 25/32] Launcher3: Grant MEDIA_CONTENT_CONTROL for QuickSpace
+ now-playing
+
+signature|privileged permission required by the now-playing chip;
+Launcher3 is privileged so allowlist it here.
+
+Change-Id: I26de94a77c3846b8b0af8e5eddaa5e59e679b34e
+---
+ com.android.launcher3-extra.xml | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/com.android.launcher3-extra.xml b/com.android.launcher3-extra.xml
+index 55468deb3b..238af026a4 100644
+--- a/com.android.launcher3-extra.xml
++++ b/com.android.launcher3-extra.xml
+@@ -17,5 +17,7 @@
+ <permissions>
+     <privapp-permissions package="com.android.launcher3">
+         <permission name="android.permission.ACCESS_CONTEXTUAL_SEARCH" />
++        <!-- QuickSpace now-playing media chip -->
++        <permission name="android.permission.MEDIA_CONTENT_CONTROL" />
+     </privapp-permissions>
+ </permissions>
+-- 
+2.54.0
+

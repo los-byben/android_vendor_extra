@@ -1,0 +1,58 @@
+From 7460a6fe19aca8468f34ae333473d275370d7e1d Mon Sep 17 00:00:00 2001
+From: Pranav Vashi <neobuddy89@gmail.com>
+Date: Sun, 14 Sep 2025 01:29:15 +0530
+Subject: [PATCH 09/32] Launcher3: QuickSpace: Limit weather updates from
+ google widget
+
+Signed-off-by: Pranav Vashi <neobuddy89@gmail.com>
+---
+ .../launcher3/quickspace/QuickspaceController.java  | 13 +++++++++++++
+ 1 file changed, 13 insertions(+)
+
+diff --git a/src/com/android/launcher3/quickspace/QuickspaceController.java b/src/com/android/launcher3/quickspace/QuickspaceController.java
+index b84a7ad33a..380acbe3ed 100644
+--- a/src/com/android/launcher3/quickspace/QuickspaceController.java
++++ b/src/com/android/launcher3/quickspace/QuickspaceController.java
+@@ -74,6 +74,8 @@ public class QuickspaceController implements OmniJawsClient.OmniJawsObserver,
+     private SeraphixDataProvider mSeraphix;
+     private String mSeraphixText;
+     private Icon mSeraphixIcon;
++    private String mLastText;
++    private int mLastBmpHash;
+ 
+     private final Runnable mOnDataUpdatedRunnable = new Runnable() {
+             @Override
+@@ -223,6 +225,11 @@ public class QuickspaceController implements OmniJawsClient.OmniJawsObserver,
+     };
+ 
+     private void updateWeatherData(String text, Bitmap image) {
++        int hash = (image == null) ? 0 : (image.getWidth()*31 + image.getHeight()*17);
++        if (TextUtils.equals(text, mSeraphixText) && hash == mLastBmpHash) {
++            return;
++        }
++        mLastBmpHash = hash;
+         mSeraphixText = text;
+         mSeraphixIcon = image == null ? null : Icon.createWithBitmap(image);
+         notifyListeners();
+@@ -367,12 +374,18 @@ public class QuickspaceController implements OmniJawsClient.OmniJawsObserver,
+         mHandler.removeCallbacks(mPsaRunnable);
+         mHandler.removeCallbacks(mWeatherRunnable);
+         mHandler.removeCallbacks(mOnDataUpdatedRunnable);
++        if (mProvider == WeatherProvider.SERAPHIX && mSeraphix != null) {
++            mSeraphix.pauseListening();
++        }
+     }
+ 
+     public void onResume() {
+         registerMediaController();
+         updateMediaController();
+         decideWeatherProvider();
++        if (mProvider == WeatherProvider.SERAPHIX && mSeraphix != null) {
++            mSeraphix.resumeListening();
++        }
+         mHandler.post(mPsaRunnable);
+         notifyListeners();
+     }
+-- 
+2.54.0
+

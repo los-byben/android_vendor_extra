@@ -1,0 +1,256 @@
+From 0fce2b736b44881a1733925917f60da6e9017d31 Mon Sep 17 00:00:00 2001
+From: Pranav Vashi <neobuddy89@gmail.com>
+Date: Sat, 3 Oct 2026 19:24:56 +0530
+Subject: [PATCH 23/32] Launcher3: Fix SeraphixGoogle to parse only weather
+
+When Google has no weather, the smartspace widget shows only the
+date. The parser fell back to the last text view and reported the
+date as weather, causing a duplicate date in Quickspace.
+
+Fix this by conducting a pattern match.
+
+Various other fixes for stale text and binding issues.
+
+Signed-off-by: Pranav Vashi <neobuddy89@gmail.com>
+---
+ .../EphemeralWidgetHostViewGoogle.kt          | 83 +++++++++++++++----
+ .../seraphixgoogle/SeraphixCompanion.kt       | 20 +++--
+ .../seraphixgoogle/SeraphixDataProvider.kt    | 41 +++++----
+ 3 files changed, 106 insertions(+), 38 deletions(-)
+
+diff --git a/seraphixgoogle/src/io/chaldeaprjkt/seraphixgoogle/EphemeralWidgetHostViewGoogle.kt b/seraphixgoogle/src/io/chaldeaprjkt/seraphixgoogle/EphemeralWidgetHostViewGoogle.kt
+index ba8e0cc707..9a30ae8aaf 100644
+--- a/seraphixgoogle/src/io/chaldeaprjkt/seraphixgoogle/EphemeralWidgetHostViewGoogle.kt
++++ b/seraphixgoogle/src/io/chaldeaprjkt/seraphixgoogle/EphemeralWidgetHostViewGoogle.kt
+@@ -18,41 +18,92 @@ package io.chaldeaprjkt.seraphixgoogle
+ import android.appwidget.AppWidgetHostView
+ import android.content.Context
+ import android.graphics.drawable.BitmapDrawable
++import android.util.Log
++import android.view.View
++import android.view.ViewGroup
+ import android.widget.ImageView
+ import android.widget.RemoteViews
+ import android.widget.TextView
+-import io.chaldeaprjkt.seraphixgoogle.SeraphixCompanion.allChildren
++import io.chaldeaprjkt.seraphixgoogle.SeraphixCompanion.visibleLeaves
+ 
+ class EphemeralWidgetHostViewGoogle(context: Context?) : AppWidgetHostView(context) {
+     private var listener: DataProviderListener? = null
+ 
+     override fun updateAppWidget(remoteViews: RemoteViews?) {
+         super.updateAppWidget(remoteViews)
+-        val weather = Card()
++        val card = try {
++            if (remoteViews == null) Card() else parseWeather()
++        } catch (e: Exception) {
++            Log.w(TAG, "Failed to parse smartspace widget", e)
++            Card()
++        }
++        listener?.onDataUpdated(card)
++    }
+ 
+-        val leaves = allChildren()
+-        val textViews = leaves.filterIsInstance<TextView>().filter { it.text?.isNotEmpty() == true }
+-        val imageViews = leaves.filterIsInstance<ImageView>().filter { it.drawable != null && it.drawable is BitmapDrawable }
++    private fun parseWeather(): Card {
++        val leaves = visibleLeaves()
+ 
+-        val tempTv = textViews.firstOrNull { tv ->
+-            val t = tv.text.toString()
+-            t.contains("°") || t.contains("℃") || t.contains("℉")
+-        } ?: textViews.lastOrNull()
++        var tempView: TextView? = null
++        var temp: String? = null
++        for (tv in leaves.filterIsInstance<TextView>()) {
++            val text = tv.text ?: continue
++            val match = TEMP_REGEX.find(text) ?: continue
++            tempView = tv
++            temp = match.value.replace(WHITESPACE_REGEX, "")
++            break
++        }
++        if (tempView == null || temp.isNullOrEmpty()) return Card()
+ 
+-        weather.text = tempTv?.text?.toString()
++        val images = leaves.filterIsInstance<ImageView>()
++            .filter { it.drawable is BitmapDrawable }
+ 
+-        val iconIv = imageViews.firstOrNull { iv ->
+-            val n = try { resources.getResourceEntryName(iv.id) } catch (_: Exception) { "" }
+-            n.contains("weather", true) || n.contains("icon", true) || n.contains("temp", true)
+-        } ?: imageViews.firstOrNull()
++        val iconView = images.firstOrNull { it.idName().contains("weather", true) }
++            ?: nearestImage(tempView, images)
+ 
+-        weather.image = (iconIv?.drawable as? BitmapDrawable)?.bitmap
++        return Card(temp, (iconView?.drawable as? BitmapDrawable)?.bitmap)
++    }
+ 
+-        listener?.onDataUpdated(weather)
++    private fun nearestImage(anchor: View, images: List<ImageView>): ImageView? {
++        if (images.isEmpty()) return null
++        var parent = anchor.parent as? ViewGroup
++        var depth = 0
++        while (parent != null && depth < MAX_ANCESTOR_DEPTH) {
++            val group: ViewGroup = parent
++            images.firstOrNull { it.isDescendantOf(group) }?.let { return it }
++            if (group === this) break
++            parent = group.parent as? ViewGroup
++            depth++
++        }
++        return null
++    }
++
++    private fun View.isDescendantOf(ancestor: ViewGroup): Boolean {
++        var p = parent
++        while (p != null) {
++            if (p === ancestor) return true
++            p = p.parent
++        }
++        return false
++    }
++
++    private fun View.idName(): String = try {
++        if (id == View.NO_ID) "" else resources.getResourceEntryName(id)
++    } catch (_: Exception) {
++        ""
+     }
+ 
+     fun setOnUpdateAppWidget(listener: DataProviderListener? = null): EphemeralWidgetHostViewGoogle {
+         this.listener = listener
+         return this
+     }
++
++    companion object {
++        private const val TAG = "EphemeralWidgetHostView"
++        private const val MAX_ANCESTOR_DEPTH = 3
++
++        // Optional sign (ASCII or Unicode minus), 1-3 digits in any script,
++        // then a degree sign (optionally followed by C/F) or ℃ / ℉.
++        private val TEMP_REGEX = Regex("""[-−]?\p{Nd}{1,3}\s*(?:°\s*[CFcf]?|℃|℉)""")
++        private val WHITESPACE_REGEX = Regex("""\s+""")
++    }
+ }
+diff --git a/seraphixgoogle/src/io/chaldeaprjkt/seraphixgoogle/SeraphixCompanion.kt b/seraphixgoogle/src/io/chaldeaprjkt/seraphixgoogle/SeraphixCompanion.kt
+index 804c2b41e9..b43952cb3f 100644
+--- a/seraphixgoogle/src/io/chaldeaprjkt/seraphixgoogle/SeraphixCompanion.kt
++++ b/seraphixgoogle/src/io/chaldeaprjkt/seraphixgoogle/SeraphixCompanion.kt
+@@ -17,14 +17,8 @@ package io.chaldeaprjkt.seraphixgoogle
+ 
+ import android.content.Context
+ import android.content.pm.PackageManager
+-import android.content.res.Resources
+-import android.graphics.Bitmap
+-import android.graphics.drawable.BitmapDrawable
+ import android.view.View
+ import android.view.ViewGroup
+-import android.widget.ImageView
+-import android.widget.TextView
+-
+ 
+ object SeraphixCompanion {
+     fun Context.isPackageEnabled(packageName: String): Boolean {
+@@ -47,4 +41,18 @@ object SeraphixCompanion {
+     }
+ 
+     fun ViewGroup.allChildren() = ArrayList<View>().also { allChildren(it) }
++
++    private fun ViewGroup.visibleLeaves(list: MutableList<View>) {
++        for (i in (0 until childCount)) {
++            val child = getChildAt(i)
++            if (child.visibility != View.VISIBLE) continue
++            if (child is ViewGroup) {
++                child.visibleLeaves(list)
++            } else {
++                list.add(child)
++            }
++        }
++    }
++
++    fun ViewGroup.visibleLeaves() = ArrayList<View>().also { visibleLeaves(it) }
+ }
+diff --git a/seraphixgoogle/src/io/chaldeaprjkt/seraphixgoogle/SeraphixDataProvider.kt b/seraphixgoogle/src/io/chaldeaprjkt/seraphixgoogle/SeraphixDataProvider.kt
+index 0e99d760cf..4b9ee9a8bf 100644
+--- a/seraphixgoogle/src/io/chaldeaprjkt/seraphixgoogle/SeraphixDataProvider.kt
++++ b/seraphixgoogle/src/io/chaldeaprjkt/seraphixgoogle/SeraphixDataProvider.kt
+@@ -16,9 +16,9 @@
+ package io.chaldeaprjkt.seraphixgoogle
+ 
+ import android.appwidget.AppWidgetManager
++import android.appwidget.AppWidgetProviderInfo
+ import android.content.ComponentName
+ import android.content.Context
+-import android.util.Log
+ import io.chaldeaprjkt.seraphixgoogle.SeraphixCompanion.isPackageEnabled
+ 
+ class SeraphixDataProvider(
+@@ -27,10 +27,6 @@ class SeraphixDataProvider(
+     hostWidgetId: Int = -1
+ ) {
+     private val widgetManager by lazy { AppWidgetManager.getInstance(context) }
+-    private val providerInfo by lazy {
+-        widgetManager.installedProviders
+-            .firstOrNull { it.provider == smartspaceProviderComponent }
+-    }
+     private val widgetHost by lazy { EphemeralWidgetHostGoogle(context, hostId) }
+     private lateinit var widgetHostView: EphemeralWidgetHostViewGoogle
+     private val smartspaceProviderComponent = ComponentName(QSB_PACKAGE, SMARTSPACE_PROVIDER)
+@@ -38,6 +34,9 @@ class SeraphixDataProvider(
+     private var isWidgetBound = false
+     private var isListening = false
+ 
++    private fun findProviderInfo(): AppWidgetProviderInfo? =
++        widgetManager.installedProviders.firstOrNull { it.provider == smartspaceProviderComponent }
++
+     fun setOnDataUpdated(listener: DataProviderListener? = null): SeraphixDataProvider {
+         widgetHost.setOnDataUpdated(listener)
+         return this
+@@ -57,24 +56,34 @@ class SeraphixDataProvider(
+         }
+     }
+ 
+-    fun bind(onBounded: DataProviderBinder? = null) {
+-        if (isWidgetBound) return
+-        if (!context.isPackageEnabled(QSB_PACKAGE)) return
++    fun bind(onBounded: DataProviderBinder? = null): Boolean {
++        if (isWidgetBound) {
++            if (widgetId > -1 && widgetManager.getAppWidgetInfo(widgetId) != null) return true
++            pauseListening()
++            isWidgetBound = false
++        }
++        if (!context.isPackageEnabled(QSB_PACKAGE)) return false
++        val providerInfo = findProviderInfo() ?: return false
+ 
+-        val wInfo = widgetManager.getAppWidgetInfo(widgetId)
+-        isWidgetBound = wInfo != null && providerInfo?.provider == wInfo.provider
++        val existing = if (widgetId > -1) widgetManager.getAppWidgetInfo(widgetId) else null
++        isWidgetBound = existing != null && existing.provider == providerInfo.provider
+         if (!isWidgetBound) {
+             if (widgetId > -1) widgetHost.deleteHost()
+             widgetId = widgetHost.allocateAppWidgetId()
+             isWidgetBound = widgetManager.bindAppWidgetIdIfAllowed(widgetId, smartspaceProviderComponent)
++            if (!isWidgetBound) {
++                // Don't leak the allocated id when binding isn't permitted.
++                widgetHost.deleteAppWidgetId(widgetId)
++                widgetId = -1
++                return false
++            }
+         }
+ 
+-        if (isWidgetBound) {
+-            onBounded?.onBound(widgetId)
+-            resumeListening()
+-            widgetHostView = widgetHost.createView(context, widgetId, providerInfo)
+-                    as EphemeralWidgetHostViewGoogle
+-        }
++        onBounded?.onBound(widgetId)
++        resumeListening()
++        widgetHostView = widgetHost.createView(context, widgetId, providerInfo)
++                as EphemeralWidgetHostViewGoogle
++        return true
+     }
+ 
+     fun unbind() {
+-- 
+2.54.0
+

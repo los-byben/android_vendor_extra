@@ -1,0 +1,67 @@
+From 9d60af6bc08579621e4757c20e4fdced7e253664 Mon Sep 17 00:00:00 2001
+From: Pranav Vashi <neobuddy89@gmail.com>
+Date: Fri, 18 Sep 2026 20:23:25 +0530
+Subject: [PATCH 16/32] Launcher3: Quickspace: Remove alt quickspace references
+ when switching back to primary style
+
+Signed-off-by: Pranav Vashi <neobuddy89@gmail.com>
+---
+ .../launcher3/quickspace/QuickSpaceView.java  | 33 +++++++++++--------
+ 1 file changed, 20 insertions(+), 13 deletions(-)
+
+diff --git a/src/com/android/launcher3/quickspace/QuickSpaceView.java b/src/com/android/launcher3/quickspace/QuickSpaceView.java
+index 0d23e94240..c04da0993d 100644
+--- a/src/com/android/launcher3/quickspace/QuickSpaceView.java
++++ b/src/com/android/launcher3/quickspace/QuickSpaceView.java
+@@ -99,21 +99,25 @@ public class QuickSpaceView extends FrameLayout implements OnDataListener {
+         mEventTitle.setText(mController.getEventController().getTitle());
+         if (useAlternativeQuickspaceUI) {
+             String greetingsExt = mController.getEventController().getGreetings();
+-            if (greetingsExt != null && !greetingsExt.isEmpty()) {
+-                mGreetingsExt.setVisibility(View.VISIBLE);
+-                mGreetingsExt.setText(greetingsExt);
+-                mGreetingsExt.setEllipsize(TruncateAt.END);
+-                mGreetingsExt.setOnClickListener(mController.getEventController().getAction());
+-            } else {
+-                mGreetingsExt.setVisibility(View.GONE);
++            if (mGreetingsExt != null) {
++                if (greetingsExt != null && !greetingsExt.isEmpty()) {
++                    mGreetingsExt.setVisibility(View.VISIBLE);
++                    mGreetingsExt.setText(greetingsExt);
++                    mGreetingsExt.setEllipsize(TruncateAt.END);
++                    mGreetingsExt.setOnClickListener(mController.getEventController().getAction());
++                } else {
++                    mGreetingsExt.setVisibility(View.GONE);
++                }
+             }
+             String greetingsExtClock = mController.getEventController().getClockExt();
+-            if (greetingsExtClock != null && !greetingsExtClock.isEmpty()) {
+-                mGreetingsExtClock.setVisibility(View.VISIBLE);
+-                mGreetingsExtClock.setText(greetingsExtClock);
+-                mGreetingsExtClock.setOnClickListener(mController.getEventController().getAction());
+-            } else {
+-                mGreetingsExtClock.setVisibility(View.GONE);
++            if (mGreetingsExtClock != null) {
++                if (greetingsExtClock != null && !greetingsExtClock.isEmpty()) {
++                    mGreetingsExtClock.setVisibility(View.VISIBLE);
++                    mGreetingsExtClock.setText(greetingsExtClock);
++                    mGreetingsExtClock.setOnClickListener(mController.getEventController().getAction());
++                } else {
++                    mGreetingsExtClock.setVisibility(View.GONE);
++                }
+             }
+         }
+         boolean shouldShowPsa = mIsQuickEvent && (LauncherPrefs.SHOW_QUICKSPACE_PSONALITY.get(getContext()) ||
+@@ -228,6 +232,9 @@ public class QuickSpaceView extends FrameLayout implements OnDataListener {
+         if (LauncherPrefs.SHOW_QUICKSPACE_ALT.get(getContext())) {
+             mGreetingsExtClock = (TextView) findViewById(R.id.extended_greetings_clock);
+             mGreetingsExt = (TextView) findViewById(R.id.extended_greetings);
++        } else {
++            mGreetingsExtClock = null;
++            mGreetingsExt = null;
+         }
+     }
+ 
+-- 
+2.54.0
+

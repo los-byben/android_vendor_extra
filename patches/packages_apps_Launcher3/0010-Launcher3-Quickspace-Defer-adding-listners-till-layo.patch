@@ -1,0 +1,280 @@
+From a25de747a2ae55f0b52827ae0761ef745966660a Mon Sep 17 00:00:00 2001
+From: Pranav Vashi <neobuddy89@gmail.com>
+Date: Tue, 16 Sep 2025 23:59:17 +0530
+Subject: [PATCH 10/32] Launcher3: Quickspace: Defer adding listners till
+ layout is inflated
+
+* Few other fixes.
+
+Ref: https://github.com/crdroidandroid/issue_tracker/issues/785
+Signed-off-by: Pranav Vashi <neobuddy89@gmail.com>
+---
+ res/layout/reserved_container_workspace.xml   |  8 ---
+ .../launcher3/quickspace/QuickSpaceView.java  | 62 +++++++++++--------
+ .../quickspace/QuickspaceController.java      | 18 +++++-
+ 3 files changed, 50 insertions(+), 38 deletions(-)
+
+diff --git a/res/layout/reserved_container_workspace.xml b/res/layout/reserved_container_workspace.xml
+index 27b646898c..741f104e5c 100644
+--- a/res/layout/reserved_container_workspace.xml
++++ b/res/layout/reserved_container_workspace.xml
+@@ -23,13 +23,5 @@
+         android:layout_height="0dp"
+         android:animateLayoutChanges="true">
+ 
+-        <com.android.launcher3.BubbleTextView
+-            android:layout_gravity="center"
+-            android:id="@+id/dummyBubbleTextView"
+-            android:visibility="invisible"
+-            android:layout_width="0dp"
+-            android:layout_height="36dp"
+-            android:contentDescription="" />
+-
+     <include layout="@layout/quickspace_doubleline" />
+ </com.android.launcher3.quickspace.QuickSpaceView>
+diff --git a/src/com/android/launcher3/quickspace/QuickSpaceView.java b/src/com/android/launcher3/quickspace/QuickSpaceView.java
+index 2dc52cf275..0fc00979f8 100644
+--- a/src/com/android/launcher3/quickspace/QuickSpaceView.java
++++ b/src/com/android/launcher3/quickspace/QuickSpaceView.java
+@@ -15,10 +15,7 @@
+  */
+ package com.android.launcher3.quickspace;
+ 
+-import android.content.ActivityNotFoundException;
+-import android.content.ComponentName;
+ import android.content.Context;
+-import android.content.pm.PackageManager;
+ import android.content.res.ColorStateList;
+ import android.graphics.drawable.Drawable;
+ import android.text.TextUtils.TruncateAt;
+@@ -26,16 +23,16 @@ import android.util.AttributeSet;
+ import android.view.LayoutInflater;
+ import android.view.View;
+ import android.view.ViewGroup;
++import android.view.ViewTreeObserver;
+ import android.view.animation.AccelerateInterpolator;
+ import android.view.animation.DecelerateInterpolator;
++import android.view.animation.Interpolator;
+ import android.widget.FrameLayout;
+ import android.widget.ImageView;
+ import android.widget.TextView;
+ 
+-import com.android.launcher3.BubbleTextView;
+ import com.android.launcher3.LauncherPrefs;
+ import com.android.launcher3.R;
+-import com.android.launcher3.model.data.ItemInfo;
+ import com.android.launcher3.util.Themes;
+ 
+ import com.android.launcher3.quickspace.QuickspaceController.OnDataListener;
+@@ -47,7 +44,6 @@ public class QuickSpaceView extends FrameLayout implements OnDataListener {
+     private static final boolean DEBUG = false;
+ 
+     public final ColorStateList mColorStateList;
+-    public BubbleTextView mBubbleTextView;
+     public final int mQuickspaceBackgroundRes;
+ 
+     public ViewGroup mQuickspaceContent;
+@@ -64,6 +60,8 @@ public class QuickSpaceView extends FrameLayout implements OnDataListener {
+ 
+     public boolean mIsQuickEvent;
+     public boolean mWeatherAvailable;
++    private boolean mFinishedInflate;
++    private boolean mListenerRegistered;
+ 
+     private boolean mIsAlternateStyle = false;
+ 
+@@ -154,13 +152,21 @@ public class QuickSpaceView extends FrameLayout implements OnDataListener {
+         tv.setSelected(false);
+         tv.setEllipsize(TruncateAt.END);
+         final float textWidth = tv.getPaint().measureText(tv.getText().toString());
+-        tv.post(() -> {
+-            if (!tv.isAttachedToWindow()) return;
+-            android.text.Layout layout = tv.getLayout();
+-            if (layout != null && layout.getEllipsizedWidth() < textWidth) {
+-                tv.setEllipsize(TruncateAt.MARQUEE);
+-                tv.setMarqueeRepeatLimit(1);
+-                tv.setSelected(true);
++        tv.getViewTreeObserver().addOnGlobalLayoutListener(new ViewTreeObserver.OnGlobalLayoutListener() {
++            @Override
++            public void onGlobalLayout() {
++                if (!tv.isAttachedToWindow()) { remove(); return; }
++                android.text.Layout layout = tv.getLayout();
++                if (layout != null && layout.getEllipsizedWidth() < textWidth) {
++                    tv.setEllipsize(TruncateAt.MARQUEE);
++                    tv.setMarqueeRepeatLimit(1);
++                    tv.setSelected(true);
++                }
++                remove();
++            }
++
++            private void remove() {
++                tv.getViewTreeObserver().removeOnGlobalLayoutListener(this);
+             }
+         });
+     }
+@@ -218,7 +224,7 @@ public class QuickSpaceView extends FrameLayout implements OnDataListener {
+     }
+ 
+     private void clearOldViewState() {
+-        View[] vs = new View[]{ mBubbleTextView, mEventTitle, mEventTitleSub, mEventTitleSubColored,
++        View[] vs = new View[]{ mEventTitle, mEventTitleSub, mEventTitleSubColored,
+                 mNowPlayingIcon, mEventSubIcon, mWeatherContentSub, mWeatherIconSub, mWeatherTempSub };
+         for (View v : vs) if (v != null) {
+             v.animate().cancel();
+@@ -264,6 +270,9 @@ public class QuickSpaceView extends FrameLayout implements OnDataListener {
+         }
+     }
+ 
++    private static final Interpolator ANIMATE_IN = new DecelerateInterpolator();
++    private static final Interpolator ANIMATE_OUT = new AccelerateInterpolator();
++
+     private void animateIn(View view) {
+         if (view.getVisibility() == View.VISIBLE && view.getAlpha() == 1f) {
+             return; // Already visible
+@@ -275,7 +284,7 @@ public class QuickSpaceView extends FrameLayout implements OnDataListener {
+             .alpha(1f)
+             .translationY(0f)
+             .setDuration(300)
+-            .setInterpolator(new DecelerateInterpolator())
++            .setInterpolator(ANIMATE_IN)
+             .start();
+     }
+ 
+@@ -287,7 +296,7 @@ public class QuickSpaceView extends FrameLayout implements OnDataListener {
+             .alpha(0f)
+             .translationY(view.getHeight() / 2f)
+             .setDuration(400)
+-            .setInterpolator(new AccelerateInterpolator())
++            .setInterpolator(ANIMATE_OUT)
+             .withEndAction(() -> view.setVisibility(View.GONE))
+             .start();
+     }
+@@ -295,7 +304,8 @@ public class QuickSpaceView extends FrameLayout implements OnDataListener {
+     @Override
+     public void onAttachedToWindow() {
+         super.onAttachedToWindow();
+-        if (mController != null) {
++        if (mController != null && mFinishedInflate && !mListenerRegistered) {
++            mListenerRegistered = true;
+             mController.addListener(this);
+         }
+     }
+@@ -305,7 +315,9 @@ public class QuickSpaceView extends FrameLayout implements OnDataListener {
+         clearOldViewState();
+         super.onDetachedFromWindow();
+         if (mController != null) {
++            mController.onPause();
+             mController.removeListener(this);
++            mListenerRegistered = false;
+         }
+     }
+ 
+@@ -313,14 +325,11 @@ public class QuickSpaceView extends FrameLayout implements OnDataListener {
+     public void onFinishInflate() {
+         super.onFinishInflate();
+         loadViews();
+-        mBubbleTextView = findViewById(R.id.dummyBubbleTextView);
+-        mBubbleTextView.setTag(new ItemInfo() {
+-            @Override
+-            public ComponentName getTargetComponent() {
+-                return new ComponentName(getContext(), "");
+-            }
+-        });
+-        mBubbleTextView.setContentDescription("");
++        mFinishedInflate = true;
++        if (mController != null && isAttachedToWindow() && !mListenerRegistered) {
++            mController.addListener(this);
++            mListenerRegistered = true;
++        }
+     }
+ 
+     public void onPause() {
+@@ -328,13 +337,12 @@ public class QuickSpaceView extends FrameLayout implements OnDataListener {
+     }
+ 
+     public void onResume() {
+-        mController.onResume();
++        if (mListenerRegistered) mController.onResume();
+     }
+ 
+     public void onDestroy() {
+         mController.onDestroy();
+         mController = null;
+-        mBubbleTextView = null;
+         mQuickspaceContent = null;
+         mEventSubIcon = null;
+         mNowPlayingIcon = null;
+diff --git a/src/com/android/launcher3/quickspace/QuickspaceController.java b/src/com/android/launcher3/quickspace/QuickspaceController.java
+index 380acbe3ed..4ace1e5f63 100644
+--- a/src/com/android/launcher3/quickspace/QuickspaceController.java
++++ b/src/com/android/launcher3/quickspace/QuickspaceController.java
+@@ -63,6 +63,7 @@ public class QuickspaceController implements OmniJawsClient.OmniJawsObserver,
+     private OmniJawsClient.WeatherInfo mWeatherInfo;
+     private Drawable mConditionImage;
+     private boolean mOmniRegistered = false;
++    private boolean mMediaRegistered = false;
+ 
+     private static final long PSA_UPDATE_DELAY_MS = 3 * 60 * 1000;
+ 
+@@ -225,7 +226,7 @@ public class QuickspaceController implements OmniJawsClient.OmniJawsObserver,
+     };
+ 
+     private void updateWeatherData(String text, Bitmap image) {
+-        int hash = (image == null) ? 0 : (image.getWidth()*31 + image.getHeight()*17);
++        int hash = (image == null) ? 0 : image.getGenerationId();
+         if (TextUtils.equals(text, mSeraphixText) && hash == mLastBmpHash) {
+             return;
+         }
+@@ -245,7 +246,7 @@ public class QuickspaceController implements OmniJawsClient.OmniJawsObserver,
+             decideWeatherProvider();
+             registerMediaController();
+             mEventsController.initQuickEvents();
+-            mHandler.post(mPsaRunnable);
++            updatePSAevent();
+         }
+         listener.onDataUpdated();
+     }
+@@ -386,7 +387,7 @@ public class QuickspaceController implements OmniJawsClient.OmniJawsObserver,
+         if (mProvider == WeatherProvider.SERAPHIX && mSeraphix != null) {
+             mSeraphix.resumeListening();
+         }
+-        mHandler.post(mPsaRunnable);
++        updatePSAevent();
+         notifyListeners();
+     }
+ 
+@@ -420,20 +421,31 @@ public class QuickspaceController implements OmniJawsClient.OmniJawsObserver,
+         queryAndUpdateWeather();
+     }
+ 
++    private void updatePSAevent() {
++        mHandler.removeCallbacks(mPsaRunnable);
++        mHandler.post(mPsaRunnable);
++    }
++
+     private void queryAndUpdateWeather() {
++        mHandler.removeCallbacks(mWeatherRunnable);
+         mHandler.post(mWeatherRunnable);
+     }
+ 
+     public void notifyListeners() {
++        mHandler.removeCallbacks(mOnDataUpdatedRunnable);
+         mHandler.post(mOnDataUpdatedRunnable);
+     }
+ 
+     private void registerMediaController() {
++        if (mMediaRegistered) return;
+         MSMHProxy.INSTANCE(mContext).addMediaMetadataListener(this);
++        mMediaRegistered = true;
+     }
+ 
+     private void unregisterMediaController() {
++        if (!mMediaRegistered) return;
+         MSMHProxy.INSTANCE(mContext).removeMediaMetadataListener(this);
++        mMediaRegistered = false;
+     }
+ 
+     private boolean updateMediaController() {
+-- 
+2.54.0
+
