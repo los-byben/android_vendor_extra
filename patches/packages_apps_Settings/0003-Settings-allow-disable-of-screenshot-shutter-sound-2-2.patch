@@ -1,0 +1,52 @@
+From a16cc7ea39e4e32f5ebc02f9a8cbaa6bd302079b Mon Sep 17 00:00:00 2001
+From: maxwen <max.weninger@gmail.com>
+Date: Sun, 4 Oct 2026 10:39:20 +0700
+Subject: [PATCH] Settings: allow disable of screenshot shutter sound [2/2]
+
+Change-Id: I159585ff4ed8b1c7d45613dc5d39309b5eeb0ea3
+(cherry picked from commit 805d2149aba9ba9d1d3a29dad43b512701f78c86)
+
+Adapt to Lineage:
+- Use lineageos.preference.LineageSystemSettingSwitchPreference
+  instead of org.evolution.settings.preferences.SystemSettingSwitchPreference
+- Put string in res/values/strings.xml instead of evolution_strings.xml
+- defaultValue 1 -> true
+
+Change-Id: I69ee5567e65d888a2ebde111cec942b53e563bcf
+---
+ res/values/strings.xml     | 3 +++
+ res/xml/sound_settings.xml | 7 +++++++
+ 2 files changed, 10 insertions(+)
+
+diff --git a/res/values/strings.xml b/res/values/strings.xml
+index a84186b..ac692e4 100644
+--- a/res/values/strings.xml
++++ b/res/values/strings.xml
+@@ -9078,6 +9078,9 @@
+     <!-- Sound: Other sounds: Title for the option enabling touch sounds. [CHAR LIMIT=30] -->
+     <string name="touch_sounds_title">Tap &amp; click sounds</string>
+ 
++    <!-- Sound: Other sounds: Title for the option enabling screenshot sound. -->
++    <string name="screenshot_shutter_sound_title">Screenshot sound</string>
++
+     <!-- Sound: Other sounds: Title for the option enabling the vibrate icon. [CHAR LIMIT=50] -->
+     <string name="vibrate_icon_title">Always show icon when in vibrate mode</string>
+ 
+diff --git a/res/xml/sound_settings.xml b/res/xml/sound_settings.xml
+index 2ddbd52..ec5d0c3 100644
+--- a/res/xml/sound_settings.xml
++++ b/res/xml/sound_settings.xml
+@@ -230,6 +230,13 @@
+             android:title="@string/touch_sounds_title"
+             android:order="-30"/>
+ 
++        <!-- Screenshot sound -->
++        <lineageos.preference.LineageSystemSettingSwitchPreference
++            android:key="screenshot_shutter_sound"
++            android:title="@string/screenshot_shutter_sound_title"
++            android:defaultValue="true"
++            android:order="-28" />
++
+         <!-- Show vibrate icon in status bar -->
+         <SwitchPreferenceCompat
+             android:key="vibrate_icon"

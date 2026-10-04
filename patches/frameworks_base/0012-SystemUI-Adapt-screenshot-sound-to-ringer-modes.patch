@@ -1,0 +1,185 @@
+From 6ecfb60ede5eeb3d9c6899fed0381c1b2f7f203a Mon Sep 17 00:00:00 2001
+From: Ashwin R C <ashwin2001achu@gmail.com>
+Date: Sun, 4 Oct 2026 10:43:40 +0700
+Subject: [PATCH] SystemUI: Adapt screenshot sound to ringer modes
+
+[SahilSonar - POSP]: Forward port to android-12.0.0
+idoybh: Adapt to A13
+
+Change-Id: I381c351131241e45ddb6049706d6c302c2eee946
+
+base: allow disable of screenshot shutter sound [1/2]
+
+[SahilSonar - POSP]
+ - Forward port to android-12.0.0
+
+idoybh: Adapt to A13
+
+Change-Id: I47d52bba21170118af87d35376d81d7569587a2f
+
+SystemUI: Screenshots: Refactor shutter sound logic
+
+* Commit 2f09bacae02fe7a99d62355331c3a26b83752a6a introduced some
+  duplicated code
+* Move it to an own method to reduce the footprint in the AOSP code parts
+  and to reduce duplication
+
+[SahilSonar - POSP]
+  - Forward port to androi-12.0.0
+
+idoybh: Adapt to A13
+
+Change-Id: I57eaaee4db401d16cc6ef65c68604cdb4053ca01
+Signed-off-by: Anushek Prasal <anushekprasal@gmail.com>
+
+SystemUI: Fix shutter sound
+
+* When shutter sound for camera is forced on as required in some states,
+  (config_camera_sound_forced, set via mcc/mnc), we also want to
+  (or should) play it when a screenshot is taken from the preview
+  instead of an actual picture
+* This change is loosely based on
+  https://android-review.googlesource.com/c/platform/frameworks/base/+/1517742/
+  but uses publicly available APIs
+
+Testing:
+- Set config_camera_sound_forced to true and push a build to device
+- Turn down all stream volumes to muted
+- Take screenshot of any normal screen
+  -> No sound played
+- Open camera, take screenshot
+  -> Sound played
+- Turn up volume and repeat the screenshots
+  -> Sound played in all cases
+
+[SahilSonar - POSP]
+ - Forward port to android-12.0.0
+
+idoybh: Adapt to A13
+
+@neobuddy89:
+* Remove enforcing shutter sound via prop.
+* Adapt for A15 QPR1 new screenshot controller
+
+Change-Id: I381c351131241e45ddb6049706d6c302c2eee946
+Signed-off-by: Omkar Chandorkar <gotenksIN@aospa.co>
+Signed-off-by: Pranav Vashi <neobuddy89@gmail.com>
+
+(cherry picked from commit 9cf35e7d75a6ecbf650f75ae64166dbfbfb9d1b8)
+
+Adapt to Lineage:
+- Keep LOS Settings.java layout, only add SCREENSHOT_SHUTTER_SOUND after VOLUME_KEY_CURSOR_CONTROL (SCREEN_OFF_ANIMATION not present in this base)
+
+Change-Id: Ibf1f65030ebaf78f13c040ae26f97606d7b757ef
+---
+ core/java/android/provider/Settings.java      |  5 +++
+ .../screenshot/ScreenshotController.kt        | 43 ++++++++++++++++++-
+ 2 files changed, 46 insertions(+), 2 deletions(-)
+
+diff --git a/core/java/android/provider/Settings.java b/core/java/android/provider/Settings.java
+index e151f2215..bc198e10c 100644
+--- a/core/java/android/provider/Settings.java
++++ b/core/java/android/provider/Settings.java
+@@ -6894,6 +6894,11 @@ public final class Settings {
+          * the setting value. See an example above.
+          */
+ 
++        /**
++         * @hide
++         */
++        public static final String SCREENSHOT_SHUTTER_SOUND = "screenshot_shutter_sound";
++
+         /**
+          * Keys we no longer back up under the current schema, but want to continue to
+          * process when restoring historical backup datasets.
+diff --git a/packages/SystemUI/src/com/android/systemui/screenshot/ScreenshotController.kt b/packages/SystemUI/src/com/android/systemui/screenshot/ScreenshotController.kt
+index 61c29ed30..a8477d889 100644
+--- a/packages/SystemUI/src/com/android/systemui/screenshot/ScreenshotController.kt
++++ b/packages/SystemUI/src/com/android/systemui/screenshot/ScreenshotController.kt
+@@ -28,10 +28,13 @@ import android.content.res.Configuration
+ import android.graphics.Bitmap
+ import android.graphics.Insets
+ import android.graphics.Rect
++import android.media.AudioManager
+ import android.net.Uri
+ import android.os.Process
+ import android.os.UserHandle
+ import android.os.UserManager
++import android.os.VibrationEffect
++import android.os.Vibrator
+ import android.provider.Settings
+ import android.util.DisplayMetrics
+ import android.util.Log
+@@ -122,12 +125,18 @@ internal constructor(
+                 ActivityInfo.CONFIG_ASSETS_PATHS
+         )
+ 
++    private val audioManager: AudioManager
++    private val vibrator: Vibrator?
++
+     init {
+         screenshotHandler.defaultTimeoutMillis = SCREENSHOT_CORNER_DEFAULT_TIMEOUT_MILLIS
+ 
+         window = screenshotWindowFactory.create(display)
+         context = window.getContext()
+ 
++        audioManager = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
++        vibrator = context.getSystemService(Context.VIBRATOR_SERVICE) as Vibrator?
++
+         viewProxy = viewProxyFactory.getProxy(window, display.displayId)
+ 
+         screenshotHandler.setOnTimeoutRunnable {
+@@ -482,13 +491,43 @@ internal constructor(
+         viewProxy.stopInputListening()
+     }
+ 
++    private fun playScreenshotSound() {
++        var playSound = false
++        when (audioManager.ringerMode) {
++            AudioManager.RINGER_MODE_SILENT -> {
++                // do nothing
++            }
++            AudioManager.RINGER_MODE_VIBRATE -> {
++                vibrator?.takeIf { it.hasVibrator() }?.vibrate(
++                    VibrationEffect.createOneShot(
++                        50,
++                        VibrationEffect.DEFAULT_AMPLITUDE
++                    )
++                )
++            }
++            AudioManager.RINGER_MODE_NORMAL -> {
++                // in this case we want to play sound even if not forced on
++                playSound = true
++            }
++        }
++        if (playSound && Settings.System.getIntForUser(
++                context.contentResolver,
++                Settings.System.SCREENSHOT_SHUTTER_SOUND,
++                1,
++                UserHandle.USER_CURRENT
++            ) == 1
++        ) {
++            screenshotSoundController.playScreenshotSoundAsync()
++        }
++    }
++
+     /**
+      * Save the bitmap but don't show the normal screenshot UI.. just a toast (or notification on
+      * failure).
+      */
+     private fun saveScreenshotAndToast(screenshot: ScreenshotData, finisher: Consumer<Uri?>) {
+         // Play the shutter sound to notify that we've taken a screenshot
+-        screenshotSoundController.playScreenshotSoundAsync()
++        playScreenshotSound()
+ 
+         saveScreenshotInBackground(screenshot, UUID.randomUUID(), finisher) {
+             result: ImageExporter.Result ->
+@@ -517,7 +556,7 @@ internal constructor(
+             viewProxy.createScreenshotDropInAnimation(screenRect, showFlash).apply {
+                 doOnEnd { onAnimationComplete?.run() }
+                 // Play the shutter sound to notify that we've taken a screenshot
+-                screenshotSoundController.playScreenshotSoundAsync()
++                playScreenshotSound()
+                 if (LogConfig.DEBUG_ANIM) {
+                     Log.d(TAG, "starting post-screenshot animation")
+                 }
