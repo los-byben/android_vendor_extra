@@ -1,0 +1,28 @@
+From a9782263b1145f3eee198df2d9092b84ae708a9f Mon Sep 17 00:00:00 2001
+From: Pranav Vashi <neobuddy89@gmail.com>
+Date: Mon, 4 Dec 2023 01:45:18 +0530
+Subject: [PATCH 07/30] SystemUI: Use proper tint for face unlock icon
+
+Change-Id: Idfc274050c855ebdafa5a87d1066969c38603973
+Signed-off-by: Pranav Vashi <neobuddy89@gmail.com>
+Signed-off-by: Dmitrii <bankersenator@gmail.com>
+---
+ packages/SystemUI/res/layout/keyguard_bottom_area.xml | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/packages/SystemUI/res/layout/keyguard_bottom_area.xml b/packages/SystemUI/res/layout/keyguard_bottom_area.xml
+index c53da135d861..daf920771d34 100644
+--- a/packages/SystemUI/res/layout/keyguard_bottom_area.xml
++++ b/packages/SystemUI/res/layout/keyguard_bottom_area.xml
+@@ -38,7 +38,7 @@
+             android:padding="@dimen/keyguard_affordance_fixed_padding"
+             android:layout_gravity="center"
+             android:scaleType="fitCenter"
+-            android:tint="#FFFFFF"
++            android:tint="?android:attr/textColorPrimary"
+             android:visibility="gone" />
+ 
+         <com.android.systemui.statusbar.phone.KeyguardIndicationTextView
+-- 
+2.56.0
+

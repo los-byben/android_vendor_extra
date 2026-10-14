@@ -1,0 +1,30 @@
+From d33eee75a50099bed67a2c18d95c08418f3a5594 Mon Sep 17 00:00:00 2001
+From: NurKeinNeid <nurkeinneid@derpfest.org>
+Date: Sun, 20 Jul 2025 19:21:50 +0200
+Subject: [PATCH 12/30] SystemUI: Update buildNumber flow to return null
+
+Replaced the buildNumber flow implementation to return a constant null value instead of depending on user info and development settings.
+
+Signed-off-by: NurKeinNeid <nurkeinneid@derpfest.org>
+---
+ .../development/domain/interactor/BuildNumberInteractor.kt    | 4 +---
+ 1 file changed, 1 insertion(+), 3 deletions(-)
+
+diff --git a/packages/SystemUI/src/com/android/systemui/development/domain/interactor/BuildNumberInteractor.kt b/packages/SystemUI/src/com/android/systemui/development/domain/interactor/BuildNumberInteractor.kt
+index cd783fe6c831..9b9ab51132da 100644
+--- a/packages/SystemUI/src/com/android/systemui/development/domain/interactor/BuildNumberInteractor.kt
++++ b/packages/SystemUI/src/com/android/systemui/development/domain/interactor/BuildNumberInteractor.kt
+@@ -60,9 +60,7 @@ constructor(
+      * @see DevelopmentSettingRepository.isDevelopmentSettingEnabled
+      */
+     val buildNumber: StateFlow<BuildNumber?> =
+-        userRepository.selectedUserInfo
+-            .flatMapConcat { userInfo -> repository.isDevelopmentSettingEnabled(userInfo) }
+-            .map { enabled -> buildText.takeIf { enabled } }
++        kotlinx.coroutines.flow.flowOf(null)
+             .stateIn(applicationScope, WhileSubscribed(), null)
+ 
+     // Special indicator for FG.
+-- 
+2.56.0
+

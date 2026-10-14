@@ -1,44 +1,48 @@
-From 9b2f645faef443c581cc74279834120637f06329 Mon Sep 17 00:00:00 2001
+From e4d46eb05cae3e1d34c301f14295695c32492ee6 Mon Sep 17 00:00:00 2001
 From: Chris Crump <chriscrawford893@gmail.com>
-Date: Sat, 25 Nov 2023 11:35:30 +0000
-Subject: [PATCH 04/11] base: Initial SenseProvider for FaceSense service
+Date: Tue, 25 Mar 2025 00:56:47 +0530
+Subject: [PATCH 01/30] base: Initial SenseProvider for FaceSense service
 
-Thanks to Tobi to figure out the fix for FaceSense needing
-a reboot to work after registering a face model. Thanks to
-someone5678, rayavanindra, adarshgrewal for fixing compile.
+Thanks to Tobi to figure out the fix for FaceSense needing a reboot to work after registering a face model.
+Also thanks to someone5678 for fixing compile on QPR1.
+
+Squashed with:
+
+    Authro: aswin7469 <aswinas@pixysos.com>
+    Date: Tue, 19 Mar 2024 19:31:42 +0530
+    FaceSense: Adapt for 14 QPR2
+
+    Change-Id: I755e9d745bf68c7974cb215354602d291eafd333
+    Signed-off-by: aswin7469 <aswinas@pixysos.com>
 
 Co-authored-by: Adithya R <gh0strider.2k18.reborn@gmail.com>
 Co-authored-by: Tobias Merkel <stylogey@gmail.com>
 Co-authored-by: someone5678 <someone5678@users.noreply.github.com>
 Co-authored-by: aswin7469 <aswinas@pixysos.com>
-Co-authored-by: COSMIC <rayavanindra@gmail.com>
-Co-authored-by: AdarshGrewal <adarshgrewal@gmail.com>
 Change-Id: I1b83429a793a50fba292a38dbf5aa8a54ae5ace3
 Signed-off-by: NurKeinNeid <mralexman3000@gmail.com>
-Signed-off-by: hridaya <hridaya@pixelos.net>
-Signed-off-by: inferno0230 <mail@inferno0230.in>
 ---
  .../privacy/AppOpsPrivacyItemMonitor.kt       |    8 +
  .../phone/BiometricUnlockController.java      |    2 +-
  .../phone/KeyguardBypassController.kt         |   11 +-
  services/core/Android.bp                      |    1 +
  .../biometrics/sensors/face/FaceService.java  |   25 +
- .../face/sense/BiometricTestSessionImpl.java  |  234 ++++
+ .../face/sense/BiometricTestSessionImpl.java  |  227 ++++
  .../face/sense/FaceAuthenticationClient.java  |  231 ++++
  .../sensors/face/sense/FaceEnrollClient.java  |  134 ++
  .../sense/FaceGenerateChallengeClient.java    |  111 ++
  .../face/sense/FaceGetFeatureClient.java      |  101 ++
- .../face/sense/FaceInternalCleanupClient.java |   76 ++
+ .../face/sense/FaceInternalCleanupClient.java |   70 ++
  .../sense/FaceInternalEnumerateClient.java    |   64 +
  .../sensors/face/sense/FaceRemovalClient.java |   63 +
- .../face/sense/FaceResetLockoutClient.java    |   83 ++
+ .../face/sense/FaceResetLockoutClient.java    |   82 ++
  .../face/sense/FaceRevokeChallengeClient.java |   55 +
  .../face/sense/FaceSetFeatureClient.java      |   93 ++
- .../sense/FaceUpdateActiveUserClient.java     |   85 ++
- .../sensors/face/sense/SenseProvider.java     | 1117 +++++++++++++++++
+ .../sense/FaceUpdateActiveUserClient.java     |   84 ++
+ .../sensors/face/sense/SenseProvider.java     | 1111 +++++++++++++++++
  .../sensors/face/sense/SenseUtils.java        |   61 +
  .../sensors/face/sense/TestHal.java           |  144 +++
- 20 files changed, 2694 insertions(+), 5 deletions(-)
+ 20 files changed, 2673 insertions(+), 5 deletions(-)
  create mode 100644 services/core/java/com/android/server/biometrics/sensors/face/sense/BiometricTestSessionImpl.java
  create mode 100644 services/core/java/com/android/server/biometrics/sensors/face/sense/FaceAuthenticationClient.java
  create mode 100644 services/core/java/com/android/server/biometrics/sensors/face/sense/FaceEnrollClient.java
@@ -56,7 +60,7 @@ Signed-off-by: inferno0230 <mail@inferno0230.in>
  create mode 100644 services/core/java/com/android/server/biometrics/sensors/face/sense/TestHal.java
 
 diff --git a/packages/SystemUI/src/com/android/systemui/privacy/AppOpsPrivacyItemMonitor.kt b/packages/SystemUI/src/com/android/systemui/privacy/AppOpsPrivacyItemMonitor.kt
-index 06e1862da..c42d9a792 100644
+index 06e1862daa10..c42d9a7920d5 100644
 --- a/packages/SystemUI/src/com/android/systemui/privacy/AppOpsPrivacyItemMonitor.kt
 +++ b/packages/SystemUI/src/com/android/systemui/privacy/AppOpsPrivacyItemMonitor.kt
 @@ -136,6 +136,10 @@ constructor(
@@ -82,7 +86,7 @@ index 06e1862da..c42d9a792 100644
          return PrivacyItem(type, app, appOpItem.timeStartedElapsed, appOpItem.isDisabled)
      }
 diff --git a/packages/SystemUI/src/com/android/systemui/statusbar/phone/BiometricUnlockController.java b/packages/SystemUI/src/com/android/systemui/statusbar/phone/BiometricUnlockController.java
-index 86c37e52c..68a62e06f 100644
+index 86c37e52c914..68a62e06f2a2 100644
 --- a/packages/SystemUI/src/com/android/systemui/statusbar/phone/BiometricUnlockController.java
 +++ b/packages/SystemUI/src/com/android/systemui/statusbar/phone/BiometricUnlockController.java
 @@ -707,7 +707,7 @@ public class BiometricUnlockController extends KeyguardUpdateMonitorCallback imp
@@ -95,7 +99,7 @@ index 86c37e52c..68a62e06f 100644
          final boolean isBouncerShowing = isBouncerShowing();
  
 diff --git a/packages/SystemUI/src/com/android/systemui/statusbar/phone/KeyguardBypassController.kt b/packages/SystemUI/src/com/android/systemui/statusbar/phone/KeyguardBypassController.kt
-index 481dda9f2..bf10b45f5 100644
+index 481dda9f2401..bf10b45f5ff3 100644
 --- a/packages/SystemUI/src/com/android/systemui/statusbar/phone/KeyguardBypassController.kt
 +++ b/packages/SystemUI/src/com/android/systemui/statusbar/phone/KeyguardBypassController.kt
 @@ -119,6 +119,8 @@ constructor(
@@ -145,7 +149,7 @@ index 481dda9f2..bf10b45f5 100644
          pw.println("  bouncerShowing: $bouncerShowing")
          pw.println(
 diff --git a/services/core/Android.bp b/services/core/Android.bp
-index 7ce5d205b..b34880aec 100644
+index 7ce5d205b891..b34880aec32e 100644
 --- a/services/core/Android.bp
 +++ b/services/core/Android.bp
 @@ -274,6 +274,7 @@ java_library_static {
@@ -157,7 +161,7 @@ index 7ce5d205b..b34880aec 100644
      javac_shard_size: 50,
      javacflags: [
 diff --git a/services/core/java/com/android/server/biometrics/sensors/face/FaceService.java b/services/core/java/com/android/server/biometrics/sensors/face/FaceService.java
-index a34791f70..ae25d4951 100644
+index a34791f70533..ae25d4951744 100644
 --- a/services/core/java/com/android/server/biometrics/sensors/face/FaceService.java
 +++ b/services/core/java/com/android/server/biometrics/sensors/face/FaceService.java
 @@ -26,6 +26,7 @@ import android.app.ActivityManager;
@@ -226,10 +230,10 @@ index a34791f70..ae25d4951 100644
  
 diff --git a/services/core/java/com/android/server/biometrics/sensors/face/sense/BiometricTestSessionImpl.java b/services/core/java/com/android/server/biometrics/sensors/face/sense/BiometricTestSessionImpl.java
 new file mode 100644
-index 000000000..90dc55a7e
+index 000000000000..0ab778ec3095
 --- /dev/null
 +++ b/services/core/java/com/android/server/biometrics/sensors/face/sense/BiometricTestSessionImpl.java
-@@ -0,0 +1,234 @@
+@@ -0,0 +1,227 @@
 +/*
 + * Copyright (C) 2020 The Android Open Source Project
 + * Copyright (C) 2023 Paranoid Android
@@ -456,17 +460,10 @@ index 000000000..90dc55a7e
 +            }
 +        });
 +    }
-+
-+    @android.annotation.EnforcePermission(android.Manifest.permission.TEST_BIOMETRIC)
-+    @Override
-+    public int getSensorId() {
-+        super.getSensorId_enforcePermission();
-+        return mSensorId;
-+    }
 +}
 diff --git a/services/core/java/com/android/server/biometrics/sensors/face/sense/FaceAuthenticationClient.java b/services/core/java/com/android/server/biometrics/sensors/face/sense/FaceAuthenticationClient.java
 new file mode 100644
-index 000000000..c99e0d190
+index 000000000000..2500414c2a81
 --- /dev/null
 +++ b/services/core/java/com/android/server/biometrics/sensors/face/sense/FaceAuthenticationClient.java
 @@ -0,0 +1,231 @@
@@ -625,19 +622,19 @@ index 000000000..c99e0d190
 +        mCallback.onClientFinished(this, true /* success */);
 +    }
 +
-+    public @LockoutTracker.LockoutMode int handleFailedAttempt(int userId) {
-+         @LockoutTracker.LockoutMode final int lockoutMode =
-+                 getLockoutTracker().getLockoutModeForUser(userId);
-+         final PerformanceTracker performanceTracker =
-+                 PerformanceTracker.getInstanceForSensorId(getSensorId());
-+         if (lockoutMode == LockoutTracker.LOCKOUT_PERMANENT) {
-+             performanceTracker.incrementPermanentLockoutForUser(userId);
-+         } else if (lockoutMode == LockoutTracker.LOCKOUT_TIMED) {
-+             performanceTracker.incrementTimedLockoutForUser(userId);
-+         }
++    private @LockoutTracker.LockoutMode int handleFailedAttempt(int userId) {
++        @LockoutTracker.LockoutMode final int lockoutMode =
++                getLockoutTracker().getLockoutModeForUser(userId);
++        final PerformanceTracker performanceTracker =
++                PerformanceTracker.getInstanceForSensorId(getSensorId());
++        if (lockoutMode == LockoutTracker.LOCKOUT_PERMANENT) {
++            performanceTracker.incrementPermanentLockoutForUser(userId);
++        } else if (lockoutMode == LockoutTracker.LOCKOUT_TIMED) {
++            performanceTracker.incrementTimedLockoutForUser(userId);
++        }
 +
-+         return lockoutMode;
-+     }
++        return lockoutMode;
++    }
 +
 +    @Override
 +    public void onAuthenticated(BiometricAuthenticator.Identifier identifier,
@@ -703,7 +700,7 @@ index 000000000..c99e0d190
 +}
 diff --git a/services/core/java/com/android/server/biometrics/sensors/face/sense/FaceEnrollClient.java b/services/core/java/com/android/server/biometrics/sensors/face/sense/FaceEnrollClient.java
 new file mode 100644
-index 000000000..875aab5a2
+index 000000000000..875aab5a264f
 --- /dev/null
 +++ b/services/core/java/com/android/server/biometrics/sensors/face/sense/FaceEnrollClient.java
 @@ -0,0 +1,134 @@
@@ -843,7 +840,7 @@ index 000000000..875aab5a2
 +}
 diff --git a/services/core/java/com/android/server/biometrics/sensors/face/sense/FaceGenerateChallengeClient.java b/services/core/java/com/android/server/biometrics/sensors/face/sense/FaceGenerateChallengeClient.java
 new file mode 100644
-index 000000000..9a9414ff9
+index 000000000000..9a9414ff9449
 --- /dev/null
 +++ b/services/core/java/com/android/server/biometrics/sensors/face/sense/FaceGenerateChallengeClient.java
 @@ -0,0 +1,111 @@
@@ -960,7 +957,7 @@ index 000000000..9a9414ff9
 +}
 diff --git a/services/core/java/com/android/server/biometrics/sensors/face/sense/FaceGetFeatureClient.java b/services/core/java/com/android/server/biometrics/sensors/face/sense/FaceGetFeatureClient.java
 new file mode 100644
-index 000000000..73f99f168
+index 000000000000..fc3b8223a967
 --- /dev/null
 +++ b/services/core/java/com/android/server/biometrics/sensors/face/sense/FaceGetFeatureClient.java
 @@ -0,0 +1,101 @@
@@ -1015,7 +1012,7 @@ index 000000000..73f99f168
 +            @NonNull BiometricLogger logger, @NonNull BiometricContext biometricContext,
 +            int feature, int faceId) {
 +        super(context, lazyDaemon, token, listener, userId, owner, 0 /* cookie */, sensorId,
-+                logger, biometricContext, false /* isMandatoryBiometrics */);
++                logger, biometricContext);
 +        mFeature = feature;
 +        mFaceId = faceId;
 +    }
@@ -1067,10 +1064,10 @@ index 000000000..73f99f168
 +}
 diff --git a/services/core/java/com/android/server/biometrics/sensors/face/sense/FaceInternalCleanupClient.java b/services/core/java/com/android/server/biometrics/sensors/face/sense/FaceInternalCleanupClient.java
 new file mode 100644
-index 000000000..d1537ffee
+index 000000000000..40f864d351f3
 --- /dev/null
 +++ b/services/core/java/com/android/server/biometrics/sensors/face/sense/FaceInternalCleanupClient.java
-@@ -0,0 +1,76 @@
+@@ -0,0 +1,70 @@
 +/*
 + * Copyright (C) 2020 The Android Open Source Project
 + * Copyright (C) 2023 Paranoid Android
@@ -1092,7 +1089,6 @@ index 000000000..d1537ffee
 +
 +import android.annotation.NonNull;
 +import android.content.Context;
-+import android.hardware.biometrics.BiometricsProtoEnums;
 +import android.hardware.face.Face;
 +import android.os.IBinder;
 +
@@ -1141,15 +1137,10 @@ index 000000000..d1537ffee
 +                null /* ClientMonitorCallbackConverter */, biometricId, userId, owner, utils,
 +                sensorId, logger, biometricContext, authenticatorIds, reason);
 +    }
-+
-+    @Override
-+    protected int getModality() {
-+        return BiometricsProtoEnums.MODALITY_FACE;
-+    }
 +}
 diff --git a/services/core/java/com/android/server/biometrics/sensors/face/sense/FaceInternalEnumerateClient.java b/services/core/java/com/android/server/biometrics/sensors/face/sense/FaceInternalEnumerateClient.java
 new file mode 100644
-index 000000000..c86d0361f
+index 000000000000..c86d0361f9e8
 --- /dev/null
 +++ b/services/core/java/com/android/server/biometrics/sensors/face/sense/FaceInternalEnumerateClient.java
 @@ -0,0 +1,64 @@
@@ -1219,7 +1210,7 @@ index 000000000..c86d0361f
 +}
 diff --git a/services/core/java/com/android/server/biometrics/sensors/face/sense/FaceRemovalClient.java b/services/core/java/com/android/server/biometrics/sensors/face/sense/FaceRemovalClient.java
 new file mode 100644
-index 000000000..54494cb90
+index 000000000000..54494cb90a6e
 --- /dev/null
 +++ b/services/core/java/com/android/server/biometrics/sensors/face/sense/FaceRemovalClient.java
 @@ -0,0 +1,63 @@
@@ -1288,10 +1279,10 @@ index 000000000..54494cb90
 +}
 diff --git a/services/core/java/com/android/server/biometrics/sensors/face/sense/FaceResetLockoutClient.java b/services/core/java/com/android/server/biometrics/sensors/face/sense/FaceResetLockoutClient.java
 new file mode 100644
-index 000000000..1a9a91b97
+index 000000000000..ab791d0be4df
 --- /dev/null
 +++ b/services/core/java/com/android/server/biometrics/sensors/face/sense/FaceResetLockoutClient.java
-@@ -0,0 +1,83 @@
+@@ -0,0 +1,82 @@
 +/*
 + * Copyright (C) 2020 The Android Open Source Project
 + * Copyright (C) 2023 Paranoid Android
@@ -1338,8 +1329,7 @@ index 000000000..1a9a91b97
 +            @NonNull BiometricLogger logger, @NonNull BiometricContext biometricContext,
 +            @NonNull byte[] hardwareAuthToken) {
 +        super(context, lazyDaemon, null /* token */, null /* listener */, userId, owner,
-+                0 /* cookie */, sensorId, logger, biometricContext,
-+                false /* isMandatoryBiometrics */);
++                0 /* cookie */, sensorId, logger, biometricContext);
 +
 +        mHardwareAuthToken = (byte[]) hardwareAuthToken.clone();
 +    }
@@ -1377,7 +1367,7 @@ index 000000000..1a9a91b97
 +}
 diff --git a/services/core/java/com/android/server/biometrics/sensors/face/sense/FaceRevokeChallengeClient.java b/services/core/java/com/android/server/biometrics/sensors/face/sense/FaceRevokeChallengeClient.java
 new file mode 100644
-index 000000000..7f42df49d
+index 000000000000..7f42df49d0d9
 --- /dev/null
 +++ b/services/core/java/com/android/server/biometrics/sensors/face/sense/FaceRevokeChallengeClient.java
 @@ -0,0 +1,55 @@
@@ -1438,7 +1428,7 @@ index 000000000..7f42df49d
 +}
 diff --git a/services/core/java/com/android/server/biometrics/sensors/face/sense/FaceSetFeatureClient.java b/services/core/java/com/android/server/biometrics/sensors/face/sense/FaceSetFeatureClient.java
 new file mode 100644
-index 000000000..0b8d3ffff
+index 000000000000..65f17d5abf73
 --- /dev/null
 +++ b/services/core/java/com/android/server/biometrics/sensors/face/sense/FaceSetFeatureClient.java
 @@ -0,0 +1,93 @@
@@ -1494,7 +1484,7 @@ index 000000000..0b8d3ffff
 +            @NonNull BiometricLogger logger, @NonNull BiometricContext biometricContext,
 +            int feature, boolean enabled, byte[] hardwareAuthToken, int faceId) {
 +        super(context, lazyDaemon, token, listener, userId, owner, 0 /* cookie */, sensorId,
-+                logger, biometricContext, false /* isMandatoryBiometrics */);
++                logger, biometricContext);
 +        mFeature = feature;
 +        mEnabled = enabled;
 +        mFaceId = faceId;
@@ -1537,10 +1527,10 @@ index 000000000..0b8d3ffff
 +}
 diff --git a/services/core/java/com/android/server/biometrics/sensors/face/sense/FaceUpdateActiveUserClient.java b/services/core/java/com/android/server/biometrics/sensors/face/sense/FaceUpdateActiveUserClient.java
 new file mode 100644
-index 000000000..78e291e2e
+index 000000000000..08c075067082
 --- /dev/null
 +++ b/services/core/java/com/android/server/biometrics/sensors/face/sense/FaceUpdateActiveUserClient.java
-@@ -0,0 +1,85 @@
+@@ -0,0 +1,84 @@
 +/*
 + * Copyright (C) 2020 The Android Open Source Project
 + * Copyright (C) 2023 Paranoid Android
@@ -1591,8 +1581,7 @@ index 000000000..78e291e2e
 +            @NonNull BiometricContext biometricContext, boolean hasEnrolledBiometrics,
 +            @NonNull Map<Integer, Long> authenticatorIds) {
 +        super(context, lazyDaemon, null /* token */, null /* listener */, userId, owner,
-+                0 /* cookie */, sensorId, logger, biometricContext,
-+                false /* isMandatoryBiometrics */);
++                0 /* cookie */, sensorId, logger, biometricContext);
 +        mHasEnrolledBiometrics = hasEnrolledBiometrics;
 +        mAuthenticatorIds = authenticatorIds;
 +    }
@@ -1628,10 +1617,10 @@ index 000000000..78e291e2e
 +}
 diff --git a/services/core/java/com/android/server/biometrics/sensors/face/sense/SenseProvider.java b/services/core/java/com/android/server/biometrics/sensors/face/sense/SenseProvider.java
 new file mode 100644
-index 000000000..9da67b72f
+index 000000000000..c3433cdf1430
 --- /dev/null
 +++ b/services/core/java/com/android/server/biometrics/sensors/face/sense/SenseProvider.java
-@@ -0,0 +1,1117 @@
+@@ -0,0 +1,1111 @@
 +/*
 + * Copyright (C) 2020 The Android Open Source Project
 + * Copyright (C) 2023 Paranoid Android
@@ -2023,7 +2012,7 @@ index 000000000..9da67b72f
 +    }
 +
 +    public SenseProvider(Context context, BiometricStateCallback biometricStateCallback, FaceSensorPropertiesInternal sensorProps, LockoutResetDispatcher lockoutResetDispatcher) {
-+        this(context, biometricStateCallback, sensorProps, lockoutResetDispatcher, new BiometricScheduler(0, null));
++        this(context, biometricStateCallback, sensorProps, lockoutResetDispatcher, new BiometricScheduler<>(context, 0, null));
 +    }
 +
 +    private synchronized ISenseService getDaemon() {
@@ -2722,14 +2711,8 @@ index 000000000..9da67b72f
 +    }
 +
 +    private BiometricLogger createLogger(int statsAction, int statsClient) {
-+            return new BiometricLogger(
-+            mContext,
-+            mHandler,
-+            BiometricsProtoEnums.MODALITY_FACE,
-+            statsAction,
-+            statsClient,
-+            mAuthenticationStatsCollector
-+        );
++        return new BiometricLogger(mContext, mHandler, BiometricsProtoEnums.MODALITY_FACE,
++                statsAction, statsClient, mAuthenticationStatsCollector);
 +    }
 +
 +    /**
@@ -2751,7 +2734,7 @@ index 000000000..9da67b72f
 +}
 diff --git a/services/core/java/com/android/server/biometrics/sensors/face/sense/SenseUtils.java b/services/core/java/com/android/server/biometrics/sensors/face/sense/SenseUtils.java
 new file mode 100644
-index 000000000..9e49fa1e7
+index 000000000000..9e49fa1e7848
 --- /dev/null
 +++ b/services/core/java/com/android/server/biometrics/sensors/face/sense/SenseUtils.java
 @@ -0,0 +1,61 @@
@@ -2819,7 +2802,7 @@ index 000000000..9e49fa1e7
 \ No newline at end of file
 diff --git a/services/core/java/com/android/server/biometrics/sensors/face/sense/TestHal.java b/services/core/java/com/android/server/biometrics/sensors/face/sense/TestHal.java
 new file mode 100644
-index 000000000..0499bc51e
+index 000000000000..0499bc51ede6
 --- /dev/null
 +++ b/services/core/java/com/android/server/biometrics/sensors/face/sense/TestHal.java
 @@ -0,0 +1,144 @@
@@ -2968,5 +2951,5 @@ index 000000000..0499bc51e
 +
 +}
 -- 
-2.54.0
+2.56.0
 

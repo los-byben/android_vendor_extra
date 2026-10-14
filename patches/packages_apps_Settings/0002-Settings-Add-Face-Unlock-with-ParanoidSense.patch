@@ -1,7 +1,7 @@
-From 3696d1e5c103384b38d70afebabfa120b7301ab3 Mon Sep 17 00:00:00 2001
+From abd61e2be92873a2547030a598077980ecd43398 Mon Sep 17 00:00:00 2001
 From: Chris Crump <chriscrawford893@gmail.com>
 Date: Thu, 3 Oct 2024 12:22:13 +0000
-Subject: [PATCH] Settings: Add Face Unlock with ParanoidSense
+Subject: [PATCH 1/2] Settings: Add Face Unlock with ParanoidSense
 
 Based on AOSPA's implementation and adapted by @ghostrider-reborn
 
@@ -12,7 +12,7 @@ Signed-off-by: Pranav Vashi <neobuddy89@gmail.com>
  1 file changed, 1 insertion(+), 1 deletion(-)
 
 diff --git a/AndroidManifest.xml b/AndroidManifest.xml
-index 2523082..da9d97d 100644
+index 2523082b311..da9d97d58bd 100644
 --- a/AndroidManifest.xml
 +++ b/AndroidManifest.xml
 @@ -3153,7 +3153,7 @@
@@ -25,5 +25,5 @@ index 2523082..da9d97d 100644
              android:screenOrientation="portrait"/>
  
 -- 
-2.54.0
+2.56.0
 

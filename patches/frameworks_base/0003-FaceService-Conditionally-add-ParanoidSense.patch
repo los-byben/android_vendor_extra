@@ -1,7 +1,7 @@
-From 6f4100c99155e060d1d3e075a44e7369545612ef Mon Sep 17 00:00:00 2001
+From 8ff4d861070b79658b068a4f11652468788fa13a Mon Sep 17 00:00:00 2001
 From: someone5678 <someone5678@users.noreply.github.com>
 Date: Mon, 8 Jan 2024 18:42:13 +0900
-Subject: [PATCH 05/11] FaceService: Conditionally add ParanoidSense
+Subject: [PATCH 03/30] FaceService: Conditionally add ParanoidSense
 
 * We allows devices to use their own FaceService as ParanoidSense has weak modality
 * To make above impl complete, conditionally add ParanoidSense and un-comment AIDL provider support
@@ -15,7 +15,7 @@ Change-Id: I7321580b87499f4020d3b080779e2f9cb1a6fce6
  1 file changed, 15 insertions(+), 16 deletions(-)
 
 diff --git a/services/core/java/com/android/server/biometrics/sensors/face/FaceService.java b/services/core/java/com/android/server/biometrics/sensors/face/FaceService.java
-index ae25d4951..ad1577abd 100644
+index ae25d4951744..ad1577abdd12 100644
 --- a/services/core/java/com/android/server/biometrics/sensors/face/FaceService.java
 +++ b/services/core/java/com/android/server/biometrics/sensors/face/FaceService.java
 @@ -664,19 +664,17 @@ public class FaceService extends SystemService {
@@ -68,5 +68,5 @@ index ae25d4951..ad1577abd 100644
          }
  
 -- 
-2.54.0
+2.56.0
 

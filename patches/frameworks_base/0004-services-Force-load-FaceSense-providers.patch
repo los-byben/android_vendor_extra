@@ -1,7 +1,7 @@
-From 5887b9d92d251b319551e489371b05e10dedbf5f Mon Sep 17 00:00:00 2001
+From 13657bd895b69e17c233059beb46b6bfbacc0a1f Mon Sep 17 00:00:00 2001
 From: Pranav Vashi <neobuddy89@gmail.com>
 Date: Mon, 14 Oct 2024 17:04:40 +0530
-Subject: [PATCH 07/11] services: Force load FaceSense providers
+Subject: [PATCH 04/30] services: Force load FaceSense providers
 
 * Current AOSP implementation checks if HIDL/AIDL configs available and
   skips registering providers if configs not available.
@@ -16,7 +16,7 @@ Signed-off-by: Pranav Vashi <neobuddy89@gmail.com>
  3 files changed, 8 insertions(+), 2 deletions(-)
 
 diff --git a/services/core/java/com/android/server/biometrics/AuthService.java b/services/core/java/com/android/server/biometrics/AuthService.java
-index 5314437f5..393b67e84 100644
+index 5314437f50d8..393b67e84620 100644
 --- a/services/core/java/com/android/server/biometrics/AuthService.java
 +++ b/services/core/java/com/android/server/biometrics/AuthService.java
 @@ -78,6 +78,7 @@ import com.android.internal.annotations.VisibleForTesting;
@@ -38,7 +38,7 @@ index 5314437f5..393b67e84 100644
              return;
          }
 diff --git a/services/core/java/com/android/server/biometrics/sensors/BiometricScheduler.java b/services/core/java/com/android/server/biometrics/sensors/BiometricScheduler.java
-index 1d4e8b8c1..32a22344a 100644
+index 1d4e8b8c185e..32a22344abd1 100644
 --- a/services/core/java/com/android/server/biometrics/sensors/BiometricScheduler.java
 +++ b/services/core/java/com/android/server/biometrics/sensors/BiometricScheduler.java
 @@ -311,6 +311,10 @@ public class BiometricScheduler<T, U> {
@@ -53,7 +53,7 @@ index 1d4e8b8c1..32a22344a 100644
          final int currentUserId = mCurrentUserRetriever.get();
          final int nextUserId = mPendingOperations.getFirst().getTargetUserId();
 diff --git a/services/core/java/com/android/server/biometrics/sensors/face/FaceService.java b/services/core/java/com/android/server/biometrics/sensors/face/FaceService.java
-index ad1577abd..b3e576994 100644
+index ad1577abdd12..b3e576994a7c 100644
 --- a/services/core/java/com/android/server/biometrics/sensors/face/FaceService.java
 +++ b/services/core/java/com/android/server/biometrics/sensors/face/FaceService.java
 @@ -683,7 +683,7 @@ public class FaceService extends SystemService {
@@ -66,5 +66,5 @@ index ad1577abd..b3e576994 100644
                  return;
              }
 -- 
-2.54.0
+2.56.0
 
