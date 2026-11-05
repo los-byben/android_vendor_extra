@@ -22,45 +22,6 @@ human_size() {
     numfmt --to=iec --suffix=B "$1" 2>/dev/null || echo "$1 B"
 }
 
-PROGRESS_MSG_ID=""
-
-progress_msg() {
-    if [[ -z "${PROGRESS_MSG_ID}" ]]; then
-        PROGRESS_MSG_ID=$(~/telegram.sh/telegram --send-id "$1")
-    else
-        ~/telegram.sh/telegram --edit "${PROGRESS_MSG_ID}" "$1" || true
-    fi
-}
-
-progress_bar() {
-    local pct=$1 phase=$2 filled empty i bar=""
-    filled=$(( pct / 10 )); empty=$(( 10 - filled ))
-    for ((i = 0; i < filled; i++)); do bar+="█"; done
-    for ((i = 0; i < empty; i++)); do bar+="░"; done
-    printf 'Automated weekly build — LineageOS for %s\n\n%s\n%s %s%%' "${device}" "${phase}" "${bar}" "${pct}"
-}
-
-release_fail() {
-    progress_msg "Automated weekly build — LineageOS for ${device}
-
-FAILED: $1"
-    exit 1
-}
-
-watch_build_progress() {
-    local log="$1" last=-1 pct
-    while sleep 60; do
-        [[ -f "${log}" ]] || continue
-        pct=$(grep -oP '\[\s*\K[0-9]+(?=%)' "${log}" | tail -1)
-        [[ -z "${pct}" ]] && continue
-        pct=$(( pct / 5 * 5 ))
-        if (( pct > last )); then
-            last=${pct}
-            progress_msg "$(progress_bar "${pct}" "Building")"
-        fi
-    done
-}
-
 sign() {
     keys_path="${ANDROID_BUILD_TOP}/vendor/lineage-priv/keys"
 
@@ -111,9 +72,7 @@ _release_common() {
     fi
 
     echo -e "\e[32m[INFO]\e[0m Starting release for device: ${device} (${type} variant)"
-    progress_msg "Automated weekly build — LineageOS for ${device}
-
-Starting build..."
+    telegram "[INFO] Starting release for device: ${device} (${type} variant)"
 
     [[ -d "${ANDROID_BUILD_TOP}/ota" ]] && rm -rf "${ANDROID_BUILD_TOP}/ota"
     git clone https://github.com/los-byben/ota "${ANDROID_BUILD_TOP}/ota"
@@ -130,25 +89,13 @@ Starting build..."
     breakfast "${device}"
     m installclean
 
-    PROGRESS_LOG="${ANDROID_BUILD_TOP}/build-progress.log"
-    : > "${PROGRESS_LOG}"
-    watch_build_progress "${PROGRESS_LOG}" &
-    WATCH_PID=$!
-
     if [[ -n "${extraimages}" ]]; then
         echo -e "\e[32m[INFO]\e[0m Running m bacon with extraimages for ${device}"
-        timeout 12h m ${extraimages} bacon 2>&1 | tee "${PROGRESS_LOG}"
+        m ${extraimages} bacon
     else
         echo -e "\e[32m[INFO]\e[0m Running m bacon for ${device}"
-        timeout 12h m bacon 2>&1 | tee "${PROGRESS_LOG}"
+        m bacon
     fi
-    BACON_STATUS=${PIPESTATUS[0]}
-    kill "${WATCH_PID}" 2>/dev/null
-
-    if (( BACON_STATUS != 0 )); then
-        release_fail "build failed (exit ${BACON_STATUS})."
-    fi
-    progress_msg "$(progress_bar 100 "Build done")"
 
     get_prop() {
         local prop="$1"
@@ -169,7 +116,8 @@ Starting build..."
 
     if [ -z "$tag_name" ]; then
         echo -e "\e[31m[ERROR]\e[0m Failed to extract tag_name (date) from filename: ${filename}"
-        release_fail "could not read build date."
+        telegram "[ERROR] Failed to extract tag_name (date) from filename: ${filename}"
+        exit 1
     fi
 
     metadata=$(unzip -p "${OUT}/${filename}" META-INF/com/android/metadata 2>/dev/null)
@@ -190,7 +138,8 @@ Starting build..."
 
     if [ -z "${os_sdk_level}" ]; then
         echo -e "\e[31m[ERROR]\e[0m Failed to read post-sdk-level from ${filename} metadata."
-        release_fail "could not read build metadata."
+        telegram "[ERROR] Failed to read post-sdk-level from ${filename} metadata."
+        exit 1
     fi
 
     if [ -z "${ota_property_files}" ]; then
@@ -249,22 +198,20 @@ send_release_notes() {
         msg+=$'\n'"<a href=\"${furl}\">${base}</a> ($(human_size "${fsize}"))"
     done <<< "${images}"
 
-    if [[ -n "${PROGRESS_MSG_ID:-}" ]]; then
-        ~/telegram.sh/telegram --edit "${PROGRESS_MSG_ID}" "${msg}"
-    else
-        telegram "${msg}"
-    fi
+    telegram "${msg}"
 }
 
 _release_finish() {
     if [ -z "${datetime}" ]; then
         echo -e "\e[31m[ERROR]\e[0m Failed to read ro.build.date.utc from ${filename}."
-        release_fail "could not read build date."
+        telegram "[ERROR] Failed to read ro.build.date.utc from ${filename}."
+        exit 1
     fi
 
     if [ -z "${size}" ]; then
         echo -e "\e[31m[ERROR]\e[0m Failed to determine file size for ${filename}. File may not exist."
-        release_fail "build output not found."
+        telegram "[ERROR] Failed to determine file size for ${filename}."
+        exit 1
     fi
 
     ota_entry=$(jq -n \
