@@ -23,6 +23,9 @@ endif
 # MiuiCamera
 $(call inherit-product-if-exists, device/xiaomi/$(shell echo -n $(TARGET_PRODUCT) | sed -e 's/^[a-z]*_//g')-miuicamera/device.mk)
 
+# MotoCamera
+$(call inherit-product-if-exists, vendor/motorola/motocamera/MotoCamera.mk)
+
 # Overlay
 PRODUCT_PACKAGES += \
     UpdaterOverlayExtra
