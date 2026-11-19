@@ -14,8 +14,7 @@ endif
 
 # GMS
 ifeq ($(WITH_GMS),true)
-$(call inherit-product, vendor/pixel/gms/products/gms.mk)
-$(call inherit-product, vendor/pixel/clocks/products/clocks.mk)
+$(call inherit-product, vendor/gapps/arm64/arm64-vendor.mk)
 
 PRODUCT_PACKAGES += \
     UpdaterOverlayExtraGMS

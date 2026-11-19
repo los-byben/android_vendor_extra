@@ -2,7 +2,7 @@ export BUILD_USERNAME="byben"
 export BUILD_HOSTNAME="wkcw"
 
 enable_gms() {
-    if [[ "${1:-false}" == "true" && -f vendor/pixel/gms/products/gms.mk ]]; then
+    if [[ "${1:-false}" == "true" && -f vendor/gapps/arm64/arm64-vendor.mk ]]; then
         export WITH_GMS=true
         export TARGET_UNOFFICIAL_BUILD_ID=gms
         echo -e "\e[32m[INFO]\e[0m Enabling GMS build."
