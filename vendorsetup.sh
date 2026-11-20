@@ -1,6 +1,8 @@
 export BUILD_USERNAME="byben"
 export BUILD_HOSTNAME="wkcw"
 
+gh_repo="los-byben/ota"
+
 enable_gms() {
     if [[ "${1:-false}" == "true" && -f vendor/gapps/arm64/arm64-vendor.mk ]]; then
         export WITH_GMS=true
@@ -278,72 +280,12 @@ _release_finish() {
     send_release_notes
 }
 
-release_gms() {
-    local device="${1:?Usage: release_gms <device>}"
-    enable_gms true
-    extraimages="bootimage recoveryimage vendorbootimage initbootimage"
-    sf_project_name="wakacaw-project"
-
-    _release_common "${device}"
-
-    release_url="https://sourceforge.net/projects/${sf_project_name}/files/${device}/lineage/${tag_name}/$(basename ${filename})/download"
-
-    {
-        echo "mkdir /home/frs/project/${sf_project_name}/${device}/lineage/"
-        echo "mkdir /home/frs/project/${sf_project_name}/${device}/lineage/${tag_name}/"
-    } | sftp ramaadni@frs.sourceforge.net
-
-    rsync -Ph ${OUT}/${filename} ramaadni@frs.sourceforge.net:/home/frs/project/${sf_project_name}/${device}/lineage/"${tag_name}"/
-    rsync -Ph ${OUT}/${filename}.sha256sum ramaadni@frs.sourceforge.net:/home/frs/project/${sf_project_name}/${device}/lineage/"${tag_name}"/
-
-    echo "[INFO] Processing extra images (SourceForge):"
-    echo "${images}"
-
-    while IFS= read -r image; do
-        if [[ -v "image_map[${image}]" ]]; then
-            image_path="${image_map[${image}]}"
-            if [ -f "${image_path}" ]; then
-                remote_file="$(basename "${image_path}")"
-                remote_path="/home/frs/project/${sf_project_name}/${device}/lineage/${tag_name}/${remote_file}"
-                echo "[INFO] Checking size of ${remote_file} on the server at path: ${remote_path}"
-                rsync_output=$(rsync --dry-run -avz "ramaadni@frs.sourceforge.net:${remote_path}" 2>&1)
-
-                if echo "${rsync_output}" | grep -q 'No such file or directory'; then
-                    echo "[INFO] ${remote_file} not found on the server. Proceeding with upload."
-                    rsync -Ph "${image_path}" "ramaadni@frs.sourceforge.net:${remote_path}"
-                else
-                    remote_size=$(echo "${rsync_output}" | grep -oP '(\d+) bytes' | awk '{print $1}')
-                    if [ -n "${remote_size}" ]; then
-                        echo "[INFO] Found ${remote_file} on server, size: ${remote_size} bytes."
-                        [ "${remote_size}" -gt 0 ] && echo "[INFO] ${remote_file} already exists. Skipping upload."
-                    else
-                        echo "[ERROR] Failed to extract size for ${remote_file}."
-                    fi
-                fi
-            else
-                echo "[ERROR] ${image_path} not found in ${OUT}"
-            fi
-        else
-            echo "[ERROR] Unknown extra image: $image"
-        fi
-    done <<< "${images}"
-
-    _release_finish
-}
-
-release_vanilla() {
-    local device="${1:?Usage: release_vanilla <device>}"
-    enable_gms false
-    extraimages="bootimage recoveryimage vendorbootimage initbootimage"
-    gh_repo="los-byben/ota"
-
-    _release_common "${device}"
-
+_upload_github_release() {
     gh_tag="${device}-${tag_name}"
 
-    echo -e "\e[32m[INFO]\e[0m Vanilla build, uploading to GitHub Releases (${gh_repo})"
-
     gh_assets=("${OUT}/${filename}" "${OUT}/${filename}.sha256sum")
+
+    echo -e "\e[32m[INFO]\e[0m Uploading to GitHub Releases (${gh_repo}): ${gh_tag}"
 
     echo "[INFO] Processing extra images (GitHub Releases):"
     echo "${images}"
@@ -364,13 +306,36 @@ release_vanilla() {
     else
         gh release create "${gh_tag}" "${gh_assets[@]}" \
             --repo "${gh_repo}" \
-            --title "${device_variant} - ${tag_name}" \
+            --title "${device} - ${tag_name}" \
             --notes "**Device:** ${device}
-**Variant:** VANILLA
+**Date:** ${tag_name}
+**Variant:** GMS + Vanilla
 **Version:** ${version}"
     fi
 
-    release_url="https://github.com/${gh_repo}/releases/download/${gh_tag}/$(basename ${filename})"
+    release_url="https://github.com/${gh_repo}/releases/download/${gh_tag}/$(basename "${filename}")"
+}
+
+release_gms() {
+    local device="${1:?Usage: release_gms <device>}"
+    enable_gms true
+    extraimages="bootimage recoveryimage vendorbootimage initbootimage"
+
+    _release_common "${device}"
+
+    _upload_github_release
+
+    _release_finish
+}
+
+release_vanilla() {
+    local device="${1:?Usage: release_vanilla <device>}"
+    enable_gms false
+    extraimages="bootimage recoveryimage vendorbootimage initbootimage"
+
+    _release_common "${device}"
+
+    _upload_github_release
 
     _release_finish
 }
