@@ -1,0 +1,529 @@
+From 9b488f1cdcdc31a97662428e950adff58b19a002 Mon Sep 17 00:00:00 2001
+From: Pranav Vashi <neobuddy89@gmail.com>
+Date: Tue, 31 Mar 2026 22:29:13 +0530
+Subject: [PATCH] [feature] LineageParts: Add Dynamic Bar settings
+
+[byben] Adapt from crDroidSettings for LineageOS 24.0:
+- host the toggle under Settings > System > Status bar
+- use lineageos.preference / androidx.preference classes available in tree
+- back the battery chip mode list with Settings.Secure instead of LineageSettings
+- drop crDroid guide/demo views and icon resources not present in tree
+
+Co-authored-by: ShevT <evgeny.shishkov@gmail.com>
+
+Change-Id: If708c47cfc9a4979b355f7d8cdd6d638
+---
+ res/values/arrays.xml                         |  12 ++
+ res/values/strings.xml                        |  66 ++++++
+ res/xml/dynamic_bar_settings.xml              | 174 +++++++++++++++
+ res/xml/status_bar_settings.xml               |   6 +
+ .../statusbar/DynamicBarSettings.java         | 203 ++++++++++++++++++
+ 5 files changed, 461 insertions(+)
+ create mode 100644 res/xml/dynamic_bar_settings.xml
+ create mode 100644 src/org/lineageos/lineageparts/statusbar/DynamicBarSettings.java
+
+diff --git a/res/values/arrays.xml b/res/values/arrays.xml
+index e41bcd3..fd6b243 100644
+--- a/res/values/arrays.xml
++++ b/res/values/arrays.xml
+@@ -509,4 +509,16 @@
+         <item>1</item>
+         <item>0</item>
+     </string-array>
++
++    <!-- Dynamic Bar -->
++    <string-array name="dynamic_bar_keyguard_battery_chip_entries" translatable="false">
++        <item>@string/dynamic_bar_keyguard_battery_chip_disabled</item>
++        <item>@string/dynamic_bar_keyguard_battery_chip_charging</item>
++        <item>@string/dynamic_bar_keyguard_battery_chip_always</item>
++    </string-array>
++    <string-array name="dynamic_bar_keyguard_battery_chip_values" translatable="false">
++        <item>0</item>
++        <item>1</item>
++        <item>2</item>
++    </string-array>
+ </resources>
+diff --git a/res/values/strings.xml b/res/values/strings.xml
+index 92ae00d..79ed6e5 100644
+--- a/res/values/strings.xml
++++ b/res/values/strings.xml
+@@ -692,4 +692,70 @@
+     <string name="sms_security_check_limit_summary">Apps can send %s messages in 1 minute before requiring confirmation</string>
+     <string name="sms_security_check_limit_summary_none">Apps are not allowed to send any messages without confirmation</string>
+     <string name="sms_security_check_limit_always_confirm">Always confirm</string>
++
++    <!-- Dynamic Bar settings -->
++    <string name="dynamic_bar">Dynamic Bar</string>
++    <string name="dynamic_bar_summary">Smart status bar chip for active events like recording, media, timers, and more</string>
++    <string name="dynamic_bar_enable">Enable Dynamic Bar</string>
++    <string name="dynamic_bar_enable_summary">Show a dynamic chip on the status bar for live events</string>
++    <string name="dynamic_bar_keyguard_enable">Dynamic bar on lock screen</string>
++    <string name="dynamic_bar_keyguard_enable_summary">Replace keyguard indication with dynamic bar chip on the lock screen with controls and quick actions</string>
++    <string name="dynamic_bar_keyguard_battery_chip">Battery info on lock screen</string>
++    <string name="dynamic_bar_keyguard_battery_chip_disabled">Never show</string>
++    <string name="dynamic_bar_keyguard_battery_chip_charging">Only when charging</string>
++    <string name="dynamic_bar_keyguard_battery_chip_always">Always show</string>
++    <string name="dynamic_bar_keyguard_compact_chip">Compact lock screen chip</string>
++    <string name="dynamic_bar_keyguard_compact_chip_summary">Always use the compact chip style on the lockscreen. When disabled, compact mode is used only when space is limited.</string>
++    <string name="dynamic_bar_events">Events</string>
++    <string name="dynamic_bar_event_audio_recording">Audio recording</string>
++    <string name="dynamic_bar_event_audio_recording_summary">Voice recorder and audio capture</string>
++    <string name="dynamic_bar_event_call">Ongoing call</string>
++    <string name="dynamic_bar_event_call_summary">Incoming and active calls</string>
++    <string name="dynamic_bar_event_media">Media playback</string>
++    <string name="dynamic_bar_event_media_summary">Now playing music and audio controls</string>
++    <string name="dynamic_bar_event_notification">Notifications</string>
++    <string name="dynamic_bar_event_notification_summary">Incoming notification alerts</string>
++    <string name="dynamic_bar_compact_notifications">Compact notifications</string>
++    <string name="dynamic_bar_compact_notifications_summary">Show notifications as a small chip first, tap to expand</string>
++    <string name="dynamic_bar_event_timer">Timer</string>
++    <string name="dynamic_bar_event_timer_summary">Countdown timer from clock app</string>
++    <string name="dynamic_bar_event_stopwatch">Stopwatch</string>
++    <string name="dynamic_bar_event_stopwatch_summary">Running stopwatch from clock app</string>
++    <string name="dynamic_bar_event_alarm">Alarm</string>
++    <string name="dynamic_bar_event_alarm_summary">Ringing and upcoming alarms</string>
++    <string name="dynamic_bar_event_charging">Charging started</string>
++    <string name="dynamic_bar_event_charging_summary">Battery level when plugged in</string>
++    <string name="dynamic_bar_event_bluetooth">Bluetooth</string>
++    <string name="dynamic_bar_event_bluetooth_summary">Device connection status</string>
++    <string name="dynamic_bar_event_hotspot">Hotspot</string>
++    <string name="dynamic_bar_event_hotspot_summary">Mobile hotspot active indicator</string>
++    <string name="dynamic_bar_event_ringer">Ringer Mode</string>
++    <string name="dynamic_bar_event_ringer_summary">Silent, vibrate, and ring mode changes</string>
++    <string name="dynamic_bar_event_vpn">VPN</string>
++    <string name="dynamic_bar_event_vpn_summary">Active VPN connection indicator</string>
++    <string name="dynamic_bar_event_clipboard">Clipboard</string>
++    <string name="dynamic_bar_event_clipboard_summary">Copied text and image preview</string>
++    <string name="dynamic_bar_event_torch">Flashlight</string>
++    <string name="dynamic_bar_event_torch_summary">Flashlight toggle and brightness</string>
++    <string name="dynamic_bar_event_ongoing">Ongoing activities</string>
++    <string name="dynamic_bar_event_ongoing_summary">Navigation, deliveries, and other live activities</string>
++    <string name="dynamic_bar_event_sports">Sports</string>
++    <string name="dynamic_bar_event_sports_summary">Live scores and game updates</string>
++    <string name="dynamic_bar_event_app_switch">Recent app switch</string>
++    <string name="dynamic_bar_event_app_switch_summary">Show chip when switching between recent apps</string>
++    <string name="dynamic_bar_event_biometric">Biometric unlock</string>
++    <string name="dynamic_bar_event_biometric_summary">Show chip on fingerprint or face unlock</string>
++    <string name="dynamic_bar_guide_title">How to use Dynamic Bar</string>
++    <string name="dynamic_bar_guide_chip">Events appear in the status bar showing active events like recording, media playback, and timers</string>
++    <string name="dynamic_bar_guide_swipe">When multiple events are active, swipe left or right on the chip to cycle through them</string>
++    <string name="dynamic_bar_guide_expand">Tap a chip to expand it into a detailed card with controls and additional information</string>
++    <string name="dynamic_bar_guide_dismiss">Swipe the expanded card away to dismiss it. The event continues in the background</string>
++    <string name="dynamic_bar_guide_keyguard">Dynamic bar chip also appears at the bottom of the lock screen with playback controls and quick actions</string>
++    <string name="dynamic_bar_guide_chip_title">Chip appearance</string>
++    <string name="dynamic_bar_guide_swipe_title">Swipe between chips</string>
++    <string name="dynamic_bar_guide_expand_title">Tap to expand</string>
++    <string name="dynamic_bar_guide_dismiss_title">Swipe to dismiss</string>
++    <string name="dynamic_bar_guide_keyguard_title">Lock screen chip</string>
++    <string name="dynamic_bar_footer_title">About Dynamic Bar</string>
++    <string name="dynamic_bar_footer_body">Dynamic Bar transforms your status bar into an interactive hub. Status chips appear and animate based on system events, giving you at-a-glance information without interrupting your workflow.\n\nEach event type has its own accent color and expanded card with quick actions.</string>
+ </resources>
+diff --git a/res/xml/dynamic_bar_settings.xml b/res/xml/dynamic_bar_settings.xml
+new file mode 100644
+index 0000000..8bc1894
+--- /dev/null
++++ b/res/xml/dynamic_bar_settings.xml
+@@ -0,0 +1,174 @@
++<?xml version="1.0" encoding="utf-8"?>
++<!--
++     SPDX-FileCopyrightText: The crDroid Android Project
++     SPDX-FileCopyrightText: The LineageOS Project
++     SPDX-License-Identifier: Apache-2.0
++
++     Licensed under the Apache License, Version 2.0 (the "License");
++     you may not use this file except in compliance with the License.
++     You may obtain a copy of the License at
++
++          http://www.apache.org/licenses/LICENSE-2.0
++
++     Unless required by applicable law or agreed to in writing, software
++     distributed under the License is distributed on an "AS IS" BASIS,
++     WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++     See the License for the specific language governing permissions and
++     limitations under the License.
++-->
++<PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android"
++    xmlns:settings="http://schemas.android.com/apk/res/com.android.settings"
++    android:title="@string/dynamic_bar">
++
++    <lineageos.preference.SecureSettingMainSwitchPreference
++        android:key="ax_dynamic_bar_enabled"
++        android:title="@string/dynamic_bar_enable"
++        android:defaultValue="false" />
++
++    <lineageos.preference.SecureSettingSwitchPreference
++        android:key="ax_dynamic_bar_keyguard_enabled"
++        android:title="@string/dynamic_bar_keyguard_enable"
++        android:summary="@string/dynamic_bar_keyguard_enable_summary"
++        android:defaultValue="true"
++        android:dependency="ax_dynamic_bar_enabled" />
++
++    <androidx.preference.ListPreference
++        android:key="ax_dynamic_bar_keyguard_battery_chip_mode"
++        android:title="@string/dynamic_bar_keyguard_battery_chip"
++        android:entries="@array/dynamic_bar_keyguard_battery_chip_entries"
++        android:entryValues="@array/dynamic_bar_keyguard_battery_chip_values"
++        android:defaultValue="1"
++        android:dependency="ax_dynamic_bar_keyguard_enabled" />
++
++    <PreferenceCategory
++        android:key="dynamic_bar_events_category"
++        android:title="@string/dynamic_bar_events"
++        android:dependency="ax_dynamic_bar_enabled">
++
++        <androidx.preference.SwitchPreferenceCompat
++            android:key="event_audio_recording"
++            android:title="@string/dynamic_bar_event_audio_recording"
++            android:summary="@string/dynamic_bar_event_audio_recording_summary"
++            android:defaultValue="true" />
++
++        <androidx.preference.SwitchPreferenceCompat
++            android:key="event_media"
++            android:title="@string/dynamic_bar_event_media"
++            android:summary="@string/dynamic_bar_event_media_summary"
++            android:defaultValue="true" />
++
++        <androidx.preference.SwitchPreferenceCompat
++            android:key="event_call"
++            android:title="@string/dynamic_bar_event_call"
++            android:summary="@string/dynamic_bar_event_call_summary"
++            android:defaultValue="true" />
++
++        <androidx.preference.SwitchPreferenceCompat
++            android:key="event_notification"
++            android:title="@string/dynamic_bar_event_notification"
++            android:summary="@string/dynamic_bar_event_notification_summary"
++            android:defaultValue="true" />
++
++        <lineageos.preference.SecureSettingSwitchPreference
++            android:key="ax_dynamic_bar_compact_notifications"
++            android:title="@string/dynamic_bar_compact_notifications"
++            android:summary="@string/dynamic_bar_compact_notifications_summary"
++            android:defaultValue="true"
++            android:dependency="event_notification" />
++
++        <androidx.preference.SwitchPreferenceCompat
++            android:key="event_timer"
++            android:title="@string/dynamic_bar_event_timer"
++            android:summary="@string/dynamic_bar_event_timer_summary"
++            android:defaultValue="true" />
++
++        <androidx.preference.SwitchPreferenceCompat
++            android:key="event_stopwatch"
++            android:title="@string/dynamic_bar_event_stopwatch"
++            android:summary="@string/dynamic_bar_event_stopwatch_summary"
++            android:defaultValue="true" />
++
++        <androidx.preference.SwitchPreferenceCompat
++            android:key="event_alarm"
++            android:title="@string/dynamic_bar_event_alarm"
++            android:summary="@string/dynamic_bar_event_alarm_summary"
++            android:defaultValue="true" />
++
++        <androidx.preference.SwitchPreferenceCompat
++            android:key="event_charging"
++            android:title="@string/dynamic_bar_event_charging"
++            android:summary="@string/dynamic_bar_event_charging_summary"
++            android:defaultValue="true" />
++
++        <androidx.preference.SwitchPreferenceCompat
++            android:key="event_bluetooth"
++            android:title="@string/dynamic_bar_event_bluetooth"
++            android:summary="@string/dynamic_bar_event_bluetooth_summary"
++            android:defaultValue="true" />
++
++        <androidx.preference.SwitchPreferenceCompat
++            android:key="event_hotspot"
++            android:title="@string/dynamic_bar_event_hotspot"
++            android:summary="@string/dynamic_bar_event_hotspot_summary"
++            android:defaultValue="true" />
++
++        <androidx.preference.SwitchPreferenceCompat
++            android:key="event_ringer"
++            android:title="@string/dynamic_bar_event_ringer"
++            android:summary="@string/dynamic_bar_event_ringer_summary"
++            android:defaultValue="true" />
++
++        <androidx.preference.SwitchPreferenceCompat
++            android:key="event_vpn"
++            android:title="@string/dynamic_bar_event_vpn"
++            android:summary="@string/dynamic_bar_event_vpn_summary"
++            android:defaultValue="true" />
++
++        <androidx.preference.SwitchPreferenceCompat
++            android:key="event_clipboard"
++            android:title="@string/dynamic_bar_event_clipboard"
++            android:summary="@string/dynamic_bar_event_clipboard_summary"
++            android:defaultValue="true" />
++
++        <androidx.preference.SwitchPreferenceCompat
++            android:key="event_torch"
++            android:title="@string/dynamic_bar_event_torch"
++            android:summary="@string/dynamic_bar_event_torch_summary"
++            android:defaultValue="true" />
++
++        <androidx.preference.SwitchPreferenceCompat
++            android:key="event_promoted_ongoing"
++            android:title="@string/dynamic_bar_event_ongoing"
++            android:summary="@string/dynamic_bar_event_ongoing_summary"
++            android:defaultValue="true" />
++
++        <androidx.preference.SwitchPreferenceCompat
++            android:key="event_sports"
++            android:title="@string/dynamic_bar_event_sports"
++            android:summary="@string/dynamic_bar_event_sports_summary"
++            android:defaultValue="true" />
++
++        <androidx.preference.SwitchPreferenceCompat
++            android:key="event_app_switch"
++            android:title="@string/dynamic_bar_event_app_switch"
++            android:summary="@string/dynamic_bar_event_app_switch_summary"
++            android:defaultValue="true" />
++
++        <androidx.preference.SwitchPreferenceCompat
++            android:key="event_biometric_unlock"
++            android:title="@string/dynamic_bar_event_biometric"
++            android:summary="@string/dynamic_bar_event_biometric_summary"
++            android:defaultValue="true" />
++    </PreferenceCategory>
++
++    <PreferenceCategory
++        android:key="dynamic_bar_footer_category"
++        android:title="@string/dynamic_bar_footer_title">
++
++        <Preference
++            android:key="dynamic_bar_footer"
++            android:title="@string/dynamic_bar_footer_body"
++            android:selectable="false" />
++    </PreferenceCategory>
++
++</PreferenceScreen>
+diff --git a/res/xml/status_bar_settings.xml b/res/xml/status_bar_settings.xml
+index 1bb4ee8..2c839d7 100644
+--- a/res/xml/status_bar_settings.xml
++++ b/res/xml/status_bar_settings.xml
+@@ -24,6 +24,12 @@
+         android:title="@string/network_traffic_settings_title"
+         android:summary="@string/network_traffic_settings_summary" />
+ 
++    <Preference
++        android:fragment="org.lineageos.lineageparts.statusbar.DynamicBarSettings"
++        android:key="dynamic_bar_settings"
++        android:title="@string/dynamic_bar"
++        android:summary="@string/dynamic_bar_summary" />
++
+     <PreferenceCategory
+         android:title="@string/status_bar_icons_title">
+ 
+diff --git a/src/org/lineageos/lineageparts/statusbar/DynamicBarSettings.java b/src/org/lineageos/lineageparts/statusbar/DynamicBarSettings.java
+new file mode 100644
+index 0000000..21efb2d
+--- /dev/null
++++ b/src/org/lineageos/lineageparts/statusbar/DynamicBarSettings.java
+@@ -0,0 +1,203 @@
++/*
++ * SPDX-FileCopyrightText: The crDroid Android Project
++ * SPDX-FileCopyrightText: The LineageOS Project
++ * SPDX-License-Identifier: Apache-2.0
++ */
++
++package org.lineageos.lineageparts.statusbar;
++
++import android.content.ContentResolver;
++import android.database.ContentObserver;
++import android.net.Uri;
++import android.os.Bundle;
++import android.os.Handler;
++import android.os.Looper;
++import android.os.UserHandle;
++import android.provider.Settings;
++
++import androidx.preference.ListPreference;
++import androidx.preference.Preference;
++import androidx.preference.SwitchPreferenceCompat;
++
++import org.json.JSONArray;
++
++import org.lineageos.lineageparts.R;
++import org.lineageos.lineageparts.SettingsPreferenceFragment;
++
++/**
++ * Settings screen for the Dynamic Bar status bar chips.
++ *
++ * <p>Adapted from crDroidSettings. All values live in {@link Settings.Secure} so SystemUI can read
++ * them without depending on LineageParts.
++ */
++public class DynamicBarSettings extends SettingsPreferenceFragment {
++
++    private static final String KEY_ENABLED = "ax_dynamic_bar_enabled";
++    private static final String KEY_KEYGUARD_ENABLED = "ax_dynamic_bar_keyguard_enabled";
++    private static final String KEY_EVENTS = "ax_dynamic_bar_events";
++    private static final String KEY_COMPACT_NOTIFICATIONS = "ax_dynamic_bar_compact_notifications";
++    private static final String KEY_BATTERY_CHIP_MODE =
++            "ax_dynamic_bar_keyguard_battery_chip_mode";
++
++    /** Event ids understood by the SystemUI side (see IslandActions.EVENT_TYPE_IDS). */
++    private static final String[] EVENT_TYPE_IDS = {
++            "audio_recording", "media", "call", "notification",
++            "timer", "stopwatch", "alarm", "charging",
++            "bluetooth", "hotspot", "ringer", "vpn",
++            "clipboard", "torch", "promoted_ongoing", "sports",
++            "app_switch", "biometric_unlock",
++    };
++
++    private final Handler mHandler = new Handler(Looper.getMainLooper());
++
++    private ContentResolver mResolver;
++    private ContentObserver mSettingsObserver;
++    private ListPreference mBatteryChipMode;
++
++    @Override
++    public void onCreate(Bundle savedInstanceState) {
++        super.onCreate(savedInstanceState);
++        addPreferencesFromResource(R.xml.dynamic_bar_settings);
++        getActivity().setTitle(R.string.dynamic_bar);
++
++        mResolver = getActivity().getContentResolver();
++
++        setupBatteryChipMode();
++        setupKeyguardSubPrefs();
++        setupEventToggles();
++        updateCompactNotificationVisibility();
++        registerObserver();
++    }
++
++    @Override
++    public void onDestroy() {
++        super.onDestroy();
++        if (mSettingsObserver != null) {
++            mResolver.unregisterContentObserver(mSettingsObserver);
++        }
++    }
++
++    private void setupBatteryChipMode() {
++        mBatteryChipMode = findPreference(KEY_BATTERY_CHIP_MODE);
++        if (mBatteryChipMode == null) {
++            return;
++        }
++        int mode = Settings.Secure.getIntForUser(mResolver, KEY_BATTERY_CHIP_MODE, 1,
++                UserHandle.USER_CURRENT);
++        mBatteryChipMode.setValue(String.valueOf(mode));
++        mBatteryChipMode.setOnPreferenceChangeListener((preference, newValue) -> {
++            Settings.Secure.putIntForUser(mResolver, KEY_BATTERY_CHIP_MODE,
++                    Integer.parseInt((String) newValue), UserHandle.USER_CURRENT);
++            return true;
++        });
++    }
++
++    private void setupKeyguardSubPrefs() {
++        Preference keyguardPref = findPreference(KEY_KEYGUARD_ENABLED);
++        if (keyguardPref != null) {
++            keyguardPref.setOnPreferenceChangeListener((preference, newValue) -> {
++                updateKeyguardSubPrefsVisibility((Boolean) newValue);
++                return true;
++            });
++        }
++        boolean keyguardEnabled = Settings.Secure.getIntForUser(mResolver,
++                KEY_KEYGUARD_ENABLED, 1, UserHandle.USER_CURRENT) == 1;
++        updateKeyguardSubPrefsVisibility(keyguardEnabled);
++    }
++
++    private void updateKeyguardSubPrefsVisibility(boolean keyguardEnabled) {
++        Preference batteryPref = findPreference(KEY_BATTERY_CHIP_MODE);
++        if (batteryPref != null) {
++            batteryPref.setVisible(keyguardEnabled);
++        }
++    }
++
++    private void setupEventToggles() {
++        java.util.Set<String> disabledEvents = getDisabledEvents();
++        for (String typeId : EVENT_TYPE_IDS) {
++            SwitchPreferenceCompat pref = findPreference("event_" + typeId);
++            if (pref == null) {
++                continue;
++            }
++            pref.setChecked(!disabledEvents.contains(typeId));
++            pref.setOnPreferenceChangeListener((preference, newValue) -> {
++                toggleEvent(typeId, (Boolean) newValue);
++                if ("notification".equals(typeId)) {
++                    updateCompactNotificationVisibility();
++                }
++                return true;
++            });
++        }
++    }
++
++    private java.util.Set<String> getDisabledEvents() {
++        String json = Settings.Secure.getStringForUser(mResolver, KEY_EVENTS,
++                UserHandle.USER_CURRENT);
++        if (json == null || json.trim().isEmpty()) {
++            return java.util.Collections.emptySet();
++        }
++        try {
++            JSONArray arr = new JSONArray(json);
++            java.util.Set<String> result = new java.util.HashSet<>();
++            for (int i = 0; i < arr.length(); i++) {
++                result.add(arr.getString(i));
++            }
++            return result;
++        } catch (Exception e) {
++            return java.util.Collections.emptySet();
++        }
++    }
++
++    private void toggleEvent(String typeId, boolean enabled) {
++        java.util.Set<String> current = getDisabledEvents();
++        java.util.Set<String> updated = new java.util.HashSet<>(current);
++        if (enabled) {
++            updated.remove(typeId);
++        } else {
++            updated.add(typeId);
++        }
++        String json = updated.isEmpty() ? "" : new JSONArray(updated).toString();
++        Settings.Secure.putStringForUser(mResolver, KEY_EVENTS, json, UserHandle.USER_CURRENT);
++    }
++
++    private void updateCompactNotificationVisibility() {
++        Preference compactPref = findPreference(KEY_COMPACT_NOTIFICATIONS);
++        SwitchPreferenceCompat notifPref = findPreference("event_notification");
++        if (compactPref != null && notifPref != null) {
++            compactPref.setVisible(notifPref.isChecked());
++        }
++    }
++
++    private void registerObserver() {
++        mSettingsObserver = new ContentObserver(mHandler) {
++            @Override
++            public void onChange(boolean selfChange, Uri uri) {
++                String key = uri == null ? null : uri.getLastPathSegment();
++                if (KEY_EVENTS.equals(key)) {
++                    java.util.Set<String> disabledEvents = getDisabledEvents();
++                    for (String typeId : EVENT_TYPE_IDS) {
++                        SwitchPreferenceCompat pref = findPreference("event_" + typeId);
++                        if (pref != null) {
++                            pref.setChecked(!disabledEvents.contains(typeId));
++                        }
++                    }
++                    updateCompactNotificationVisibility();
++                } else if (KEY_KEYGUARD_ENABLED.equals(key)) {
++                    boolean enabled = Settings.Secure.getIntForUser(mResolver,
++                            KEY_KEYGUARD_ENABLED, 1, UserHandle.USER_CURRENT) == 1;
++                    updateKeyguardSubPrefsVisibility(enabled);
++                } else if (KEY_BATTERY_CHIP_MODE.equals(key)) {
++                    int mode = Settings.Secure.getIntForUser(mResolver, KEY_BATTERY_CHIP_MODE,
++                            1, UserHandle.USER_CURRENT);
++                    if (mBatteryChipMode != null) {
++                        mBatteryChipMode.setValue(String.valueOf(mode));
++                    }
++                }
++            }
++        };
++        for (String key : new String[] { KEY_EVENTS, KEY_KEYGUARD_ENABLED, KEY_BATTERY_CHIP_MODE }) {
++            mResolver.registerContentObserver(Settings.Secure.getUriFor(key), false,
++                    mSettingsObserver, UserHandle.USER_ALL);
++        }
++    }
++}
+-- 
+2.43.0
+
