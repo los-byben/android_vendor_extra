@@ -1,0 +1,185 @@
+From 085cde2c109f6759b3e5ff5cefeeabe20843d69a Mon Sep 17 00:00:00 2001
+From: Adithya R <gh0strider.2k18.reborn@gmail.com>
+Date: Thu, 8 Aug 2024 20:14:44 +0530
+Subject: [PATCH 16/21] services: Add freeform system service
+
+neobuddy89: Create package to include in fwb base itself.
+
+Change-Id: Icb3933846fc38f7fe1679e7f1fd916c2c137671d
+Signed-off-by: Pranav Vashi <neobuddy89@gmail.com>
+---
+ core/res/AndroidManifest.xml                  |  4 ++
+ services/Android.bp                           |  2 +
+ services/freeform/Android.bp                  | 27 +++++++++
+ services/freeform/jarjar-rules.txt            |  2 +
+ .../server/display/FreeformService.java       | 59 +++++++++++++++++++
+ .../java/com/android/server/SystemServer.java |  5 ++
+ 6 files changed, 99 insertions(+)
+ create mode 100644 services/freeform/Android.bp
+ create mode 100644 services/freeform/jarjar-rules.txt
+ create mode 100644 services/freeform/java/com/android/server/display/FreeformService.java
+
+diff --git a/core/res/AndroidManifest.xml b/core/res/AndroidManifest.xml
+index 721e53088722..ca4b15ceabf3 100644
+--- a/core/res/AndroidManifest.xml
++++ b/core/res/AndroidManifest.xml
+@@ -992,6 +992,10 @@
+         android:knownCerts="@array/config_setContactsDefaultAccountKnownSigners"
+         android:featureFlag="android.provider.new_default_account_api_enabled"/>
+ 
++    <!-- @hide -->
++    <permission android:name="com.libremobileos.permission.START_FREEFORM"
++                android:protectionLevel="signature|privileged" />
++
+     <!-- ====================================================================== -->
+     <!-- Permissions for accessing user's calendar                              -->
+     <!-- ====================================================================== -->
+diff --git a/services/Android.bp b/services/Android.bp
+index a34e4906f94b..c5d9704e0b57 100644
+--- a/services/Android.bp
++++ b/services/Android.bp
+@@ -137,6 +137,7 @@ filegroup {
+         ":services.credentials-sources",
+         ":services.devicepolicy-sources",
+         ":services.files-sources",
++        ":services.freeform-sources",
+         ":services.lskfreset-sources",
+         ":services.midi-sources",
+         ":services.musicsearch-sources",
+@@ -338,6 +339,7 @@ java_library {
+         "services.devicepolicy",
+         "services.flags",
+         "services.files",
++        "services.freeform",
+         "services.lskfreset",
+         "services.midi",
+         "services.musicsearch",
+diff --git a/services/freeform/Android.bp b/services/freeform/Android.bp
+new file mode 100644
+index 000000000000..3920451176ca
+--- /dev/null
++++ b/services/freeform/Android.bp
+@@ -0,0 +1,27 @@
++//
++// SPDX-FileCopyrightText: 2023 The LibreMobileOS Foundation
++// SPDX-FileCopyrightText: 2024-2025 crDroid Android Project
++// SPDX-License-Identifier: Apache-2.0
++//
++
++filegroup {
++    name: "services.freeform-sources",
++    srcs: [
++        "java/**/*.java",
++        "java/**/*.kt"
++    ],
++    path: "java",
++    visibility: ["//frameworks/base/services"],
++}
++
++java_library_static {
++    name: "services.freeform",
++    defaults: ["platform_service_defaults"],
++    srcs: [":services.freeform-sources"],
++    libs: ["services.core"],
++    static_libs: [
++        "kotlinx_coroutines",
++        "lmofreeform-server",
++    ],
++    jarjar_rules: "jarjar-rules.txt",
++}
+diff --git a/services/freeform/jarjar-rules.txt b/services/freeform/jarjar-rules.txt
+new file mode 100644
+index 000000000000..a50af24f3ddd
+--- /dev/null
++++ b/services/freeform/jarjar-rules.txt
+@@ -0,0 +1,2 @@
++rule kotlin.** com.libremobileos.server.jarjar.@0
++rule kotlinx.** com.libremobileos.server.jarjar.@0
+diff --git a/services/freeform/java/com/android/server/display/FreeformService.java b/services/freeform/java/com/android/server/display/FreeformService.java
+new file mode 100644
+index 000000000000..af5c3a5484ec
+--- /dev/null
++++ b/services/freeform/java/com/android/server/display/FreeformService.java
+@@ -0,0 +1,59 @@
++/*
++ * Copyright (C) 2023-2024 LibreMobileOS Foundation
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *      http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++
++package com.android.server.display;
++
++import android.content.Context;
++import android.hardware.display.DisplayManagerInternal;
++import android.util.Slog;
++
++import com.android.server.SystemService;
++
++import com.libremobileos.freeform.server.LMOFreeformService;
++import com.libremobileos.freeform.server.LMOFreeformServiceHolder;
++import com.libremobileos.freeform.server.LMOFreeformUIService;
++
++public class FreeformService extends SystemService {
++
++    private static final String TAG = "FreeformService";
++
++    public FreeformService(Context context) {
++        super(context);
++    }
++
++    @Override
++    public void onStart() {
++        // noop
++    }
++
++    @Override
++    public void onBootPhase(@BootPhase int phase) {
++        if (phase != PHASE_ACTIVITY_MANAGER_READY || isSafeMode()) return;
++
++        Slog.d(TAG, "PHASE_ACTIVITY_MANAGER_READY, going to init!");
++
++        DisplayManagerInternal displayManager = getLocalService(DisplayManagerInternal.class);
++        if (displayManager == null) {
++            Slog.e(TAG, "Cannot init: DisplayManagerInternal is null!");
++            return;
++        }
++
++        LMOFreeformService service = new LMOFreeformService(displayManager);
++        LMOFreeformUIService uiService =
++                new LMOFreeformUIService(getContext(), displayManager, service);
++        LMOFreeformServiceHolder.init(uiService, service);
++    }
++}
+diff --git a/services/java/com/android/server/SystemServer.java b/services/java/com/android/server/SystemServer.java
+index 4bb406fc598d..be50b6be1555 100644
+--- a/services/java/com/android/server/SystemServer.java
++++ b/services/java/com/android/server/SystemServer.java
+@@ -176,6 +176,7 @@ import com.android.server.criticalevents.CriticalEventLog;
+ import com.android.server.devicepolicy.DevicePolicyManagerService;
+ import com.android.server.devicestate.DeviceStateManagerService;
+ import com.android.server.display.DisplayManagerService;
++import com.android.server.display.FreeformService;
+ import com.android.server.display.color.ColorDisplayService;
+ import com.android.server.dreams.DreamManagerService;
+ import com.android.server.emergency.EmergencyAffordanceService;
+@@ -2841,6 +2842,10 @@ public final class SystemServer implements Dumpable {
+                 t.traceEnd();
+             }
+ 
++            t.traceBegin("FreeformService");
++            mSystemServiceManager.startService(FreeformService.class);
++            t.traceEnd();
++
+             if (!isWatch) {
+                 t.traceBegin("StartPruneInstantAppsJobService");
+                 try {

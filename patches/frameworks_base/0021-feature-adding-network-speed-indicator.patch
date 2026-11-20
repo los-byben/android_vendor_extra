@@ -1,0 +1,1113 @@
+From c741b1bd7b47fcf3e2304e3bd02b1c3a0e4ab749 Mon Sep 17 00:00:00 2001
+From: heybyben <heybyben@gmail.com>
+Date: Fri, 20 Nov 2026 06:58:35 +0000
+Subject: [PATCH 21/21] [feature] adding network speed indicator
+
+[byben] Adapt for Lineage 24.0:
+- move network_speed dimens/string into existing dimens.xml and strings.xml
+- register NetworkSpeedController in SystemUICoreStartableModule
+
+Cherry-picked from AxionAOSP/android_frameworks_base 042371ec65a0fa2fb129a5dfc16d3bfe810bf99d
+
+Change-Id: I6188ec32e0f893336a04b3632dd70f72fb312ca8
+---
+ .../nt_statusbar_icon_internet_speed.xml      |  14 +
+ .../res/layout/network_speed_view.xml         |  34 +++
+ packages/SystemUI/res/values/config.xml       |   1 +
+ packages/SystemUI/res/values/dimens.xml       |   9 +
+ packages/SystemUI/res/values/strings.xml      |   3 +
+ .../SystemUI/res/xml/status_bar_prefs.xml     |   5 +
+ .../dagger/SystemUICoreStartableModule.kt     |   7 +
+ .../statusbar/phone/NetworkSpeedIconHolder.kt |  53 ++++
+ .../phone/StatusBarIconControllerImplEx.kt    | 103 +++++++
+ .../statusbar/phone/StatusBarIconHolder.kt    |   9 +-
+ .../statusbar/phone/ui/DarkIconManager.java   |   5 +-
+ .../statusbar/phone/ui/IconManager.java       |  12 +-
+ .../phone/ui/StatusBarIconControllerImpl.java |   4 +-
+ .../statusbar/phone/ui/TintedIconManager.java |  15 +-
+ .../policy/NetworkSpeedController.kt          | 177 ++++++++++++
+ .../networkspeed/NetworkSpeedIconState.kt     |  74 +++++
+ .../policy/networkspeed/NetworkSpeedView.kt   | 268 ++++++++++++++++++
+ 17 files changed, 783 insertions(+), 10 deletions(-)
+ create mode 100644 packages/SystemUI/res/drawable/nt_statusbar_icon_internet_speed.xml
+ create mode 100644 packages/SystemUI/res/layout/network_speed_view.xml
+ create mode 100644 packages/SystemUI/src/com/android/systemui/statusbar/phone/NetworkSpeedIconHolder.kt
+ create mode 100644 packages/SystemUI/src/com/android/systemui/statusbar/phone/StatusBarIconControllerImplEx.kt
+ create mode 100644 packages/SystemUI/src/com/android/systemui/statusbar/policy/NetworkSpeedController.kt
+ create mode 100644 packages/SystemUI/src/com/android/systemui/statusbar/policy/networkspeed/NetworkSpeedIconState.kt
+ create mode 100644 packages/SystemUI/src/com/android/systemui/statusbar/policy/networkspeed/NetworkSpeedView.kt
+
+diff --git a/packages/SystemUI/res/drawable/nt_statusbar_icon_internet_speed.xml b/packages/SystemUI/res/drawable/nt_statusbar_icon_internet_speed.xml
+new file mode 100644
+index 000000000000..f745f9172d6e
+--- /dev/null
++++ b/packages/SystemUI/res/drawable/nt_statusbar_icon_internet_speed.xml
+@@ -0,0 +1,14 @@
++<?xml version="1.0" encoding="utf-8"?>
++<vector xmlns:android="http://schemas.android.com/apk/res/android"
++    android:height="24dp"
++    android:width="24dp"
++    android:viewportWidth="24"
++    android:viewportHeight="24"
++    android:tint="?android:attr/colorControlNormal">
++    <path
++        android:fillColor="#FFFFFFFF"
++        android:pathData="M6.321,10H5.207V4.618L3.564,5.18V4.236L6.179,3.274H6.321V10ZM13.158,10H8.651V9.231L10.884,6.796C11.206,6.437 11.435,6.137 11.57,5.898C11.708,5.656 11.777,5.413 11.777,5.171C11.777,4.851 11.686,4.594 11.505,4.397C11.327,4.201 11.086,4.103 10.782,4.103C10.42,4.103 10.139,4.213 9.94,4.434C9.74,4.655 9.641,4.957 9.641,5.341H8.522C8.522,4.933 8.614,4.566 8.798,4.241C8.985,3.912 9.251,3.658 9.595,3.476C9.941,3.295 10.34,3.205 10.792,3.205C11.442,3.205 11.955,3.369 12.329,3.697C12.707,4.023 12.896,4.474 12.896,5.051C12.896,5.385 12.8,5.737 12.61,6.105C12.423,6.47 12.114,6.886 11.685,7.353L10.046,9.107H13.158V10ZM14.778,8.821C14.987,8.821 15.148,8.881 15.262,9.001C15.375,9.118 15.432,9.265 15.432,9.443C15.432,9.618 15.375,9.764 15.262,9.88C15.148,9.994 14.987,10.051 14.778,10.051C14.579,10.051 14.421,9.994 14.304,9.88C14.188,9.767 14.129,9.621 14.129,9.443C14.129,9.265 14.186,9.118 14.3,9.001C14.413,8.881 14.573,8.821 14.778,8.821ZM19.815,7.196C19.441,7.592 19.003,7.79 18.503,7.79C17.914,7.79 17.444,7.585 17.094,7.173C16.744,6.759 16.569,6.216 16.569,5.544C16.569,5.102 16.658,4.701 16.836,4.342C17.014,3.983 17.268,3.704 17.596,3.504C17.924,3.305 18.305,3.205 18.738,3.205C19.413,3.205 19.948,3.456 20.344,3.96C20.74,4.463 20.938,5.137 20.938,5.981V6.294C20.938,7.503 20.665,8.425 20.119,9.061C19.573,9.696 18.758,10.018 17.674,10.028H17.541V9.102H17.702C18.362,9.093 18.868,8.935 19.221,8.628C19.574,8.318 19.772,7.841 19.815,7.196ZM18.738,6.915C18.962,6.915 19.172,6.851 19.368,6.722C19.565,6.593 19.717,6.415 19.824,6.188V5.751C19.824,5.257 19.723,4.859 19.52,4.558C19.318,4.258 19.055,4.107 18.733,4.107C18.411,4.107 18.153,4.241 17.96,4.508C17.769,4.772 17.674,5.106 17.674,5.511C17.674,5.932 17.771,6.271 17.964,6.529C18.158,6.787 18.416,6.915 18.738,6.915Z"/>
++    <path
++        android:fillColor="#FFFFFFFF"
++        android:pathData="M6.038,14.973L7.488,18.826L8.935,14.973H10.064V20H9.194V18.343L9.28,16.126L7.796,20H7.171L5.689,16.129L5.776,18.343V20H4.906V14.973H6.038ZM11.1,20V14.973H12.823C13.392,14.973 13.824,15.087 14.121,15.314C14.418,15.542 14.567,15.882 14.567,16.333C14.567,16.563 14.505,16.77 14.38,16.955C14.256,17.139 14.074,17.281 13.835,17.383C14.106,17.456 14.316,17.596 14.463,17.801C14.613,18.003 14.688,18.247 14.688,18.532C14.688,19.004 14.536,19.367 14.232,19.62C13.93,19.873 13.498,20 12.934,20H11.1ZM11.974,17.732V19.302H12.944C13.218,19.302 13.432,19.235 13.586,19.099C13.74,18.963 13.817,18.774 13.817,18.532C13.817,18.01 13.55,17.743 13.016,17.732H11.974ZM11.974,17.089H12.83C13.101,17.089 13.313,17.028 13.465,16.906C13.62,16.782 13.697,16.607 13.697,16.381C13.697,16.133 13.625,15.953 13.483,15.843C13.342,15.732 13.122,15.677 12.823,15.677H11.974V17.089ZM15.717,20.432H15.057L17.035,14.973H17.695L15.717,20.432ZM20.371,18.985C20.371,18.835 20.309,18.721 20.184,18.643C20.063,18.565 19.859,18.496 19.573,18.436C19.288,18.376 19.05,18.3 18.859,18.208C18.44,18.005 18.23,17.712 18.23,17.327C18.23,17.005 18.366,16.736 18.638,16.52C18.909,16.303 19.254,16.195 19.673,16.195C20.12,16.195 20.48,16.306 20.754,16.526C21.03,16.747 21.169,17.034 21.169,17.386H20.33C20.33,17.225 20.27,17.092 20.15,16.986C20.03,16.878 19.871,16.823 19.673,16.823C19.489,16.823 19.338,16.866 19.221,16.951C19.106,17.036 19.049,17.15 19.049,17.293C19.049,17.422 19.103,17.522 19.211,17.593C19.319,17.665 19.538,17.737 19.867,17.811C20.196,17.882 20.454,17.969 20.64,18.07C20.829,18.169 20.968,18.288 21.058,18.429C21.15,18.569 21.196,18.74 21.196,18.94C21.196,19.276 21.057,19.549 20.778,19.758C20.5,19.965 20.135,20.069 19.684,20.069C19.378,20.069 19.105,20.014 18.865,19.903C18.626,19.793 18.44,19.641 18.306,19.448C18.173,19.254 18.106,19.046 18.106,18.823H18.921C18.932,19.021 19.007,19.174 19.145,19.282C19.283,19.388 19.466,19.441 19.694,19.441C19.915,19.441 20.083,19.399 20.198,19.316C20.313,19.231 20.371,19.121 20.371,18.985Z"/>
++</vector>
+diff --git a/packages/SystemUI/res/layout/network_speed_view.xml b/packages/SystemUI/res/layout/network_speed_view.xml
+new file mode 100644
+index 000000000000..7d963e507c75
+--- /dev/null
++++ b/packages/SystemUI/res/layout/network_speed_view.xml
+@@ -0,0 +1,34 @@
++<?xml version="1.0" encoding="utf-8"?>
++<com.android.systemui.statusbar.policy.networkspeed.NetworkSpeedView xmlns:android="http://schemas.android.com/apk/res/android"
++    android:layout_gravity="center_vertical"
++    android:id="@+id/network_speed"
++    android:layout_width="@dimen/network_speed_view_width"
++    android:layout_height="match_parent"
++    android:paddingEnd="@dimen/network_speed_view_padding_end">
++    <TextView
++        android:textAppearance="@style/TextAppearance.StatusBar.Default"
++        android:textSize="@dimen/network_speed_text_size"
++        android:gravity="end|center_vertical"
++        android:layout_gravity="center_horizontal"
++        android:id="@+id/number"
++        android:layout_width="match_parent"
++        android:layout_height="match_parent"
++        android:layout_marginBottom="@dimen/network_speed_margin_bottom"
++        android:maxLines="1"
++        android:includeFontPadding="false"
++        android:importantForAccessibility="no"
++        android:textAlignment="viewEnd"/>
++    <TextView
++        android:textAppearance="@style/TextAppearance.StatusBar.Default"
++        android:textSize="@dimen/network_speed_unit_text_size"
++        android:gravity="end|center_vertical"
++        android:layout_gravity="center_horizontal"
++        android:id="@+id/unit"
++        android:layout_width="match_parent"
++        android:layout_height="match_parent"
++        android:layout_marginTop="@dimen/network_speed_unit_margin_top"
++        android:maxLines="1"
++        android:includeFontPadding="false"
++        android:importantForAccessibility="no"
++        android:textAlignment="viewEnd"/>
++</com.android.systemui.statusbar.policy.networkspeed.NetworkSpeedView>
+diff --git a/packages/SystemUI/res/values/config.xml b/packages/SystemUI/res/values/config.xml
+index 140bb805af52..49b4d2bb2c76 100644
+--- a/packages/SystemUI/res/values/config.xml
++++ b/packages/SystemUI/res/values/config.xml
+@@ -580,6 +580,7 @@
+     <string-array name="config_statusBarIconsToExclude" translatable="false">
+         <item>@*android:string/status_bar_rotate</item>
+         <item>@*android:string/status_bar_headset</item>
++        <item>network_speed</item>
+     </string-array>
+ 
+ 
+diff --git a/packages/SystemUI/res/values/dimens.xml b/packages/SystemUI/res/values/dimens.xml
+index 937b1a03c4d0..90357deedbe7 100644
+--- a/packages/SystemUI/res/values/dimens.xml
++++ b/packages/SystemUI/res/values/dimens.xml
+@@ -2307,4 +2307,13 @@
+     <dimen name="usb_device_dialog_button_background_radius_full">360dp</dimen>
+     <!-- Usb Device Dialog values end -->
+ 
++    <!-- Network Speed -->
++    <dimen name="network_speed_margin_bottom">7dp</dimen>
++    <dimen name="network_speed_text_size">8dp</dimen>
++    <dimen name="network_speed_unit_margin_top">9dp</dimen>
++    <dimen name="network_speed_unit_text_size">6dp</dimen>
++    <dimen name="network_speed_view_padding_end">2dp</dimen>
++    <dimen name="network_speed_view_width">22dp</dimen>
++    <!-- Network Speed end -->
++
+ </resources>
+diff --git a/packages/SystemUI/res/values/strings.xml b/packages/SystemUI/res/values/strings.xml
+index d025a3ff3a9d..d8c2602457b7 100644
+--- a/packages/SystemUI/res/values/strings.xml
++++ b/packages/SystemUI/res/values/strings.xml
+@@ -5062,4 +5062,7 @@
+     <!-- Accessibility label for the thumbs down button on attribution dialog. [CHAR_LIMIT=NONE] -->
+     <string name="ace_attribution_thumbs_down_button_accessibility_description">Thumbs down feedback button</string>
+ 
++    <!-- Title of the network speed switch in the status bar icons tuner. [CHAR_LIMIT=30] -->
++    <string name="status_bar_settings_network_speed">Internet speed</string>
++
+ </resources>
+diff --git a/packages/SystemUI/res/xml/status_bar_prefs.xml b/packages/SystemUI/res/xml/status_bar_prefs.xml
+index 8bd0690e6608..a323523d3d3a 100644
+--- a/packages/SystemUI/res/xml/status_bar_prefs.xml
++++ b/packages/SystemUI/res/xml/status_bar_prefs.xml
+@@ -23,6 +23,11 @@
+         android:key="rotate"
+         android:title="@string/status_bar_settings_auto_rotation" />
+ 
++    <com.android.systemui.tuner.StatusBarSwitch
++        android:icon="@drawable/nt_statusbar_icon_internet_speed"
++        android:key="network_speed"
++        android:title="@string/status_bar_settings_network_speed" />
++
+     <com.android.systemui.tuner.StatusBarSwitch
+         android:icon="@drawable/ic_statusbar_headset"
+         android:key="headset"
+diff --git a/packages/SystemUI/src/com/android/systemui/dagger/SystemUICoreStartableModule.kt b/packages/SystemUI/src/com/android/systemui/dagger/SystemUICoreStartableModule.kt
+index 6463529a8901..c7246132c907 100644
+--- a/packages/SystemUI/src/com/android/systemui/dagger/SystemUICoreStartableModule.kt
++++ b/packages/SystemUI/src/com/android/systemui/dagger/SystemUICoreStartableModule.kt
+@@ -51,6 +51,7 @@ import com.android.systemui.media.taptotransfer.sender.MediaTttSenderCoordinator
+ import com.android.systemui.mediaprojection.taskswitcher.MediaProjectionTaskSwitcherCoreStartable
+ import com.android.systemui.shortcut.ShortcutKeyDispatcher
+ import com.android.systemui.statusbar.ImmersiveModeConfirmation
++import com.android.systemui.statusbar.policy.NetworkSpeedController
+ import com.android.systemui.statusbar.gesture.GesturePointerEventListener
+ import com.android.systemui.statusbar.notification.InstantAppNotifier
+ import com.android.systemui.statusbar.notification.headsup.StatusBarHeadsUpChangeListener
+@@ -329,4 +330,10 @@ abstract class SystemUICoreStartableModule {
+     abstract fun bindSysUIKeyGestureEventInitializer(
+         keyGestureEventInitializer: SysUIKeyGestureEventInitializer
+     ): CoreStartable
++
++    /** Inject into NetworkSpeedController. */
++    @Binds
++    @IntoMap
++    @ClassKey(NetworkSpeedController::class)
++    abstract fun bindNetworkSpeedController(impl: NetworkSpeedController): CoreStartable
+ }
+diff --git a/packages/SystemUI/src/com/android/systemui/statusbar/phone/NetworkSpeedIconHolder.kt b/packages/SystemUI/src/com/android/systemui/statusbar/phone/NetworkSpeedIconHolder.kt
+new file mode 100644
+index 000000000000..61cf7ad9b0dc
+--- /dev/null
++++ b/packages/SystemUI/src/com/android/systemui/statusbar/phone/NetworkSpeedIconHolder.kt
+@@ -0,0 +1,53 @@
++/*
++ * Copyright (C) 2025-2026 AxionOS Project
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *      http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++package com.android.systemui.statusbar.phone
++
++import com.android.systemui.statusbar.policy.networkspeed.NetworkSpeedIconState
++
++class NetworkSpeedIconHolder : StatusBarIconHolder() {
++
++    companion object {
++        const val TYPE_NETWORK_SPEED = 6
++
++        fun fromNetworkIconState(state: NetworkSpeedIconState): NetworkSpeedIconHolder {
++            val holder = NetworkSpeedIconHolder()
++            holder.mNetworkSpeedIconState = state
++            holder.type = TYPE_NETWORK_SPEED
++            return holder
++        }
++    }
++
++    private var mNetworkSpeedIconState: NetworkSpeedIconState? = null
++
++    fun setNetworkSpeedIconState(state: NetworkSpeedIconState) {
++        mNetworkSpeedIconState = state
++    }
++
++    fun getNetworkSpeedIconState(): NetworkSpeedIconState? {
++        return mNetworkSpeedIconState
++    }
++
++    override var isVisible: Boolean
++        get() = mNetworkSpeedIconState?.isVisible() ?: false
++        set(value) {
++            if (mNetworkSpeedIconState == null || isVisible == value) return
++            mNetworkSpeedIconState?.setVisible(value)
++        }
++
++    override fun toString(): String {
++        return mNetworkSpeedIconState?.toString() ?: "null"
++    }
++}
+diff --git a/packages/SystemUI/src/com/android/systemui/statusbar/phone/StatusBarIconControllerImplEx.kt b/packages/SystemUI/src/com/android/systemui/statusbar/phone/StatusBarIconControllerImplEx.kt
+new file mode 100644
+index 000000000000..ed6bc68f9be8
+--- /dev/null
++++ b/packages/SystemUI/src/com/android/systemui/statusbar/phone/StatusBarIconControllerImplEx.kt
+@@ -0,0 +1,103 @@
++/*
++ * Copyright (C) 2025-2026 AxionOS Project
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *      http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++package com.android.systemui.statusbar.phone
++
++import android.content.Context
++import android.view.ViewGroup
++import android.widget.LinearLayout
++import com.android.systemui.dagger.SysUISingleton
++import com.android.systemui.res.R
++import com.android.systemui.statusbar.StatusIconDisplayable
++import com.android.systemui.statusbar.phone.ui.StatusBarIconControllerImpl
++import com.android.systemui.statusbar.phone.ui.StatusBarIconList
++import com.android.systemui.statusbar.policy.NetworkSpeedController
++import com.android.systemui.statusbar.policy.networkspeed.NetworkSpeedIconState
++import com.android.systemui.statusbar.policy.networkspeed.NetworkSpeedView
++import dagger.Lazy
++import javax.inject.Inject
++
++@SysUISingleton
++class StatusBarIconControllerImplEx @Inject constructor(
++    private val context: Context,
++    private val iconController: Lazy<StatusBarIconControllerImpl>,
++    private val iconList: StatusBarIconList,
++    private val networkSpeedController: Lazy<NetworkSpeedController>
++) {
++
++    fun setNetworkSpeedIcon(slot: String, state: NetworkSpeedIconState?) {
++        if (state == null || !state.isVisible()) {
++            iconController.get().removeIcon(slot, 0)
++            return
++        }
++
++        val existingHolder = iconList.getIconHolder(slot, 0)
++
++        if (existingHolder == null) {
++            val newHolder = NetworkSpeedIconHolder.fromNetworkIconState(state)
++            iconController.get().setIcon(slot, newHolder)
++        } else if (existingHolder is NetworkSpeedIconHolder) {
++            existingHolder.setNetworkSpeedIconState(state)
++            iconController.get().handleSet(slot, existingHolder)
++        }
++    }
++
++    fun addHolder(
++        index: Int,
++        slot: String,
++        rootGroup: ViewGroup,
++        holder: StatusBarIconHolder,
++        blocked: Boolean
++    ): StatusIconDisplayable? {
++        return if (holder.type == 6 && holder is NetworkSpeedIconHolder) {
++            addNetworkSpeedIcon(index, slot, holder.getNetworkSpeedIconState(), rootGroup, blocked)
++        } else {
++            null
++        }
++    }
++
++    private fun addNetworkSpeedIcon(
++        index: Int,
++        slot: String,
++        state: NetworkSpeedIconState?,
++        rootGroup: ViewGroup,
++        blocked: Boolean
++    ): NetworkSpeedView {
++        val view = createNetworkSpeedView(slot, blocked)
++        view.applyNetworkState(state)
++        rootGroup.addView(view, index, createLayoutParams())
++        return view
++    }
++
++    private fun updateNetworkSpeedIcon(viewIndex: Int, state: NetworkSpeedIconState?, rootGroup: ViewGroup) {
++        val view = rootGroup.getChildAt(viewIndex) as? NetworkSpeedView ?: return
++        view.applyNetworkState(state)
++    }
++
++    private fun createNetworkSpeedView(slot: String, blocked: Boolean): NetworkSpeedView {
++        return NetworkSpeedView.fromContext(context, slot, blocked, networkSpeedController.get())
++    }
++
++    private fun createLayoutParams(): LinearLayout.LayoutParams {
++        val width = context.resources.getDimensionPixelSize(R.dimen.network_speed_view_width)
++        return LinearLayout.LayoutParams(width, LinearLayout.LayoutParams.MATCH_PARENT)
++    }
++
++    fun onSetIconHolder(viewIndex: Int, holder: StatusBarIconHolder, rootGroup: ViewGroup) {
++        if (holder.type == 6 && holder is NetworkSpeedIconHolder) {
++            updateNetworkSpeedIcon(viewIndex, holder.getNetworkSpeedIconState(), rootGroup)
++        }
++    }
++}
+diff --git a/packages/SystemUI/src/com/android/systemui/statusbar/phone/StatusBarIconHolder.kt b/packages/SystemUI/src/com/android/systemui/statusbar/phone/StatusBarIconHolder.kt
+index f2fd794975c9..a6fc5229c1d7 100644
+--- a/packages/SystemUI/src/com/android/systemui/statusbar/phone/StatusBarIconHolder.kt
++++ b/packages/SystemUI/src/com/android/systemui/statusbar/phone/StatusBarIconHolder.kt
+@@ -20,8 +20,8 @@ import com.android.internal.statusbar.StatusBarIcon
+ import com.android.systemui.statusbar.pipeline.icons.shared.model.ModernStatusBarViewCreator
+ 
+ /** Wraps [com.android.internal.statusbar.StatusBarIcon] so we can still have a uniform list */
+-open class StatusBarIconHolder private constructor() {
+-    @IntDef(TYPE_ICON, TYPE_MOBILE_NEW, TYPE_WIFI_NEW, TYPE_BINDABLE)
++open class StatusBarIconHolder protected constructor() {
++    @IntDef(TYPE_ICON, TYPE_MOBILE_NEW, TYPE_WIFI_NEW, TYPE_BINDABLE, TYPE_NETWORK_SPEED)
+     @Retention(AnnotationRetention.SOURCE)
+     internal annotation class IconType
+ 
+@@ -42,6 +42,7 @@ open class StatusBarIconHolder private constructor() {
+                 // The new pipeline controls visibilities via the view model and
+                 // view binder, so
+                 // this is effectively an unused return value.
++                TYPE_NETWORK_SPEED,
+                 TYPE_BINDABLE,
+                 TYPE_MOBILE_NEW,
+                 TYPE_WIFI_NEW -> true
+@@ -53,6 +54,7 @@ open class StatusBarIconHolder private constructor() {
+             }
+             when (type) {
+                 TYPE_ICON -> icon!!.visible = visible
++                TYPE_NETWORK_SPEED,
+                 TYPE_BINDABLE,
+                 TYPE_MOBILE_NEW,
+                 TYPE_WIFI_NEW -> {}
+@@ -96,9 +98,12 @@ open class StatusBarIconHolder private constructor() {
+         /** Only applicable to [BindableIconHolder] */
+         const val TYPE_BINDABLE = 5
+ 
++        const val TYPE_NETWORK_SPEED = 6
++
+         /** Returns a human-readable string representing the given type. */
+         fun getTypeString(@IconType type: Int): String {
+             return when (type) {
++                TYPE_NETWORK_SPEED -> "NETWORK_SPEED"
+                 TYPE_ICON -> "ICON"
+                 TYPE_MOBILE_NEW -> "MOBILE_NEW"
+                 TYPE_WIFI_NEW -> "WIFI_NEW"
+diff --git a/packages/SystemUI/src/com/android/systemui/statusbar/phone/ui/DarkIconManager.java b/packages/SystemUI/src/com/android/systemui/statusbar/phone/ui/DarkIconManager.java
+index 5eab64d23db3..006d8e4ce942 100644
+--- a/packages/SystemUI/src/com/android/systemui/statusbar/phone/ui/DarkIconManager.java
++++ b/packages/SystemUI/src/com/android/systemui/statusbar/phone/ui/DarkIconManager.java
+@@ -29,6 +29,7 @@ import com.android.systemui.statusbar.phone.DemoStatusIcons;
+ import com.android.systemui.statusbar.phone.StatusBarIconHolder;
+ import com.android.systemui.statusbar.phone.StatusBarLocation;
+ import com.android.systemui.statusbar.pipeline.mobile.ui.MobileUiAdapter;
++import com.android.systemui.statusbar.phone.StatusBarIconControllerImplEx;
+ import com.android.systemui.statusbar.pipeline.mobile.ui.MobileUiAdapterKairos;
+ import com.android.systemui.statusbar.pipeline.wifi.ui.WifiUiAdapter;
+ 
+@@ -56,6 +57,7 @@ public class DarkIconManager extends IconManager {
+             MobileContextProvider mobileContextProvider,
+             KairosNetwork kairosNetwork,
+             @Application CoroutineScope appScope,
++            StatusBarIconControllerImplEx iconControllerEx,
+             @Assisted DarkIconDispatcher darkIconDispatcher) {
+         super(linearLayout,
+                 location,
+@@ -64,7 +66,8 @@ public class DarkIconManager extends IconManager {
+                 mobileUiAdapterKairos,
+                 mobileContextProvider,
+                 kairosNetwork,
+-                appScope);
++                appScope,
++                iconControllerEx);
+         mIconHorizontalMargin = mContext.getResources().getDimensionPixelSize(
+                 com.android.systemui.res.R.dimen.status_bar_icon_horizontal_margin);
+         mDarkIconDispatcher = darkIconDispatcher;
+diff --git a/packages/SystemUI/src/com/android/systemui/statusbar/phone/ui/IconManager.java b/packages/SystemUI/src/com/android/systemui/statusbar/phone/ui/IconManager.java
+index 3edbbdf0e2de..9a12373b718b 100644
+--- a/packages/SystemUI/src/com/android/systemui/statusbar/phone/ui/IconManager.java
++++ b/packages/SystemUI/src/com/android/systemui/statusbar/phone/ui/IconManager.java
+@@ -20,6 +20,7 @@ import static com.android.systemui.statusbar.phone.StatusBarIconHolder.TYPE_BIND
+ import static com.android.systemui.statusbar.phone.StatusBarIconHolder.TYPE_ICON;
+ import static com.android.systemui.statusbar.phone.StatusBarIconHolder.TYPE_MOBILE_NEW;
+ import static com.android.systemui.statusbar.phone.StatusBarIconHolder.TYPE_WIFI_NEW;
++import static com.android.systemui.statusbar.phone.StatusBarIconHolder.TYPE_NETWORK_SPEED;
+ 
+ import android.annotation.Nullable;
+ import android.content.Context;
+@@ -55,6 +56,7 @@ import com.android.systemui.statusbar.pipeline.shared.ui.view.ModernStatusBarVie
+ import com.android.systemui.statusbar.pipeline.wifi.ui.WifiUiAdapter;
+ import com.android.systemui.statusbar.pipeline.wifi.ui.view.ModernStatusBarWifiView;
+ import com.android.systemui.statusbar.pipeline.wifi.ui.viewmodel.LocationBasedWifiViewModel;
++import com.android.systemui.statusbar.phone.StatusBarIconControllerImplEx;
+ import com.android.systemui.util.Assert;
+ 
+ import dagger.Lazy;
+@@ -81,6 +83,7 @@ public class IconManager implements DemoModeCommandReceiver {
+     private final Lazy<MobileUiAdapterKairos> mMobileUiAdapterKairos;
+     private final KairosNetwork mKairosNetwork;
+     private final CoroutineScope mAppScope;
++    protected final StatusBarIconControllerImplEx mIconControllerEx;
+     private final MutableIntObjectMap<Job> mBindingJobs = new MutableIntObjectMap<>();
+ 
+     /**
+@@ -110,7 +113,8 @@ public class IconManager implements DemoModeCommandReceiver {
+             Lazy<MobileUiAdapterKairos> mobileUiAdapterKairos,
+             MobileContextProvider mobileContextProvider,
+             KairosNetwork kairosNetwork,
+-            CoroutineScope appScope
++            CoroutineScope appScope,
++            StatusBarIconControllerImplEx iconControllerEx
+     ) {
+         mGroup = group;
+         mMobileContextProvider = mobileContextProvider;
+@@ -118,6 +122,7 @@ public class IconManager implements DemoModeCommandReceiver {
+         mLocation = location;
+         mKairosNetwork = kairosNetwork;
+         mAppScope = appScope;
++        mIconControllerEx = iconControllerEx;
+ 
+         reloadDimens();
+ 
+@@ -177,6 +182,8 @@ public class IconManager implements DemoModeCommandReceiver {
+             case TYPE_ICON -> addIcon(index, slot, blocked, holder.getIcon());
+             case TYPE_WIFI_NEW -> addNewWifiIcon(index, slot);
+             case TYPE_MOBILE_NEW -> addNewMobileIcon(index, slot, holder.getTag());
++            case TYPE_NETWORK_SPEED ->
++                    mIconControllerEx.addHolder(index, slot, mGroup, holder, blocked);
+             case TYPE_BINDABLE ->
+                 // Safe cast, since only BindableIconHolders can set this tag on themselves
+                     addBindableIcon((BindableIconHolder) holder, index);
+@@ -333,6 +340,9 @@ public class IconManager implements DemoModeCommandReceiver {
+             case TYPE_BINDABLE:
+                 // Nothing, the new icons update themselves
+                 return;
++            case TYPE_NETWORK_SPEED:
++                mIconControllerEx.onSetIconHolder(viewIndex, holder, mGroup);
++                return;
+             default:
+                 break;
+         }
+diff --git a/packages/SystemUI/src/com/android/systemui/statusbar/phone/ui/StatusBarIconControllerImpl.java b/packages/SystemUI/src/com/android/systemui/statusbar/phone/ui/StatusBarIconControllerImpl.java
+index 979ee71bee26..fca2849eca8e 100644
+--- a/packages/SystemUI/src/com/android/systemui/statusbar/phone/ui/StatusBarIconControllerImpl.java
++++ b/packages/SystemUI/src/com/android/systemui/statusbar/phone/ui/StatusBarIconControllerImpl.java
+@@ -374,7 +374,7 @@ public class StatusBarIconControllerImpl implements Tunable,
+         setIcon(slotName, holder);
+     }
+ 
+-    private void setIcon(String slot, @NonNull StatusBarIconHolder holder) {
++    public void setIcon(String slot, @NonNull StatusBarIconHolder holder) {
+         boolean isNew = mStatusBarIconList.getIconHolder(slot, holder.getTag()) == null;
+         mStatusBarIconList.setIcon(slot, holder);
+ 
+@@ -446,7 +446,7 @@ public class StatusBarIconControllerImpl implements Tunable,
+         }
+     }
+ 
+-    private void handleSet(String slotName, StatusBarIconHolder holder) {
++    public void handleSet(String slotName, StatusBarIconHolder holder) {
+         int viewIndex = mStatusBarIconList.getViewIndex(slotName, holder.getTag());
+         mIconGroups.forEach(l -> l.onSetIconHolder(viewIndex, holder));
+     }
+diff --git a/packages/SystemUI/src/com/android/systemui/statusbar/phone/ui/TintedIconManager.java b/packages/SystemUI/src/com/android/systemui/statusbar/phone/ui/TintedIconManager.java
+index 4ee232612774..dc37451d53c2 100644
+--- a/packages/SystemUI/src/com/android/systemui/statusbar/phone/ui/TintedIconManager.java
++++ b/packages/SystemUI/src/com/android/systemui/statusbar/phone/ui/TintedIconManager.java
+@@ -29,6 +29,7 @@ import com.android.systemui.statusbar.phone.DemoStatusIcons;
+ import com.android.systemui.statusbar.phone.StatusBarIconHolder;
+ import com.android.systemui.statusbar.phone.StatusBarLocation;
+ import com.android.systemui.statusbar.pipeline.mobile.ui.MobileUiAdapter;
++import com.android.systemui.statusbar.phone.StatusBarIconControllerImplEx;
+ import com.android.systemui.statusbar.pipeline.mobile.ui.MobileUiAdapterKairos;
+ import com.android.systemui.statusbar.pipeline.wifi.ui.WifiUiAdapter;
+ 
+@@ -57,14 +58,16 @@ public class TintedIconManager extends IconManager {
+             Lazy<MobileUiAdapterKairos> mobileUiAdapterKairos,
+             MobileContextProvider mobileContextProvider,
+             KairosNetwork kairosNetwork,
+-            CoroutineScope appScope
++            CoroutineScope appScope,
++            StatusBarIconControllerImplEx iconControllerEx
+     ) {
+         super(group,
+                 location,
+                 wifiUiAdapter,
+                 mobileUiAdapter,
+                 mobileUiAdapterKairos,
+-                mobileContextProvider, kairosNetwork, appScope);
++                mobileContextProvider, kairosNetwork, appScope,
++                iconControllerEx);
+     }
+ 
+     @Override
+@@ -116,6 +119,7 @@ public class TintedIconManager extends IconManager {
+         private final Lazy<MobileUiAdapterKairos> mMobileUiAdapterKairos;
+         private final KairosNetwork mKairosNetwork;
+         private final CoroutineScope mAppScope;
++        private final StatusBarIconControllerImplEx mIconControllerEx;
+ 
+         @Inject
+         public Factory(
+@@ -124,7 +128,8 @@ public class TintedIconManager extends IconManager {
+                 MobileContextProvider mobileContextProvider,
+                 Lazy<MobileUiAdapterKairos> mobileUiAdapterKairos,
+                 KairosNetwork kairosNetwork,
+-                @Application CoroutineScope appScope
++                @Application CoroutineScope appScope,
++                StatusBarIconControllerImplEx iconControllerEx
+         ) {
+             mWifiUiAdapter = wifiUiAdapter;
+             mMobileUiAdapter = mobileUiAdapter;
+@@ -132,6 +137,7 @@ public class TintedIconManager extends IconManager {
+             mMobileUiAdapterKairos = mobileUiAdapterKairos;
+             mKairosNetwork = kairosNetwork;
+             mAppScope = appScope;
++            mIconControllerEx = iconControllerEx;
+         }
+ 
+         /** Creates a new {@link TintedIconManager} for the given view group and location. */
+@@ -144,7 +150,8 @@ public class TintedIconManager extends IconManager {
+                     mMobileUiAdapterKairos,
+                     mMobileContextProvider,
+                     mKairosNetwork,
+-                    mAppScope);
++                    mAppScope,
++                    mIconControllerEx);
+         }
+     }
+ }
+diff --git a/packages/SystemUI/src/com/android/systemui/statusbar/policy/NetworkSpeedController.kt b/packages/SystemUI/src/com/android/systemui/statusbar/policy/NetworkSpeedController.kt
+new file mode 100644
+index 000000000000..ffe0e8ac6c0a
+--- /dev/null
++++ b/packages/SystemUI/src/com/android/systemui/statusbar/policy/NetworkSpeedController.kt
+@@ -0,0 +1,177 @@
++/*
++ * Copyright (C) 2025-2026 AxionOS Project
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *      http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++package com.android.systemui.statusbar.policy
++
++import android.content.Context
++import android.net.ConnectivityManager
++import android.net.Network
++import android.net.TrafficStats
++import com.android.keyguard.KeyguardUpdateMonitor
++import com.android.keyguard.KeyguardUpdateMonitorCallback
++import com.android.systemui.CoreStartable
++import com.android.systemui.dagger.SysUISingleton
++import com.android.systemui.dagger.qualifiers.Background
++import com.android.systemui.dagger.qualifiers.Main
++import com.android.systemui.statusbar.phone.StatusBarIconControllerImplEx
++import com.android.systemui.statusbar.policy.networkspeed.NetworkSpeedIconState
++import com.android.systemui.util.settings.SecureSettings
++import com.android.systemui.util.settings.SettingsProxyExt.observerFlow
++import javax.inject.Inject
++import kotlinx.coroutines.CoroutineDispatcher
++import kotlinx.coroutines.CoroutineScope
++import kotlinx.coroutines.Job
++import kotlinx.coroutines.SupervisorJob
++import kotlinx.coroutines.delay
++import kotlinx.coroutines.flow.distinctUntilChanged
++import kotlinx.coroutines.flow.flowOn
++import kotlinx.coroutines.flow.map
++import kotlinx.coroutines.flow.onStart
++import kotlinx.coroutines.isActive
++import kotlinx.coroutines.launch
++import kotlinx.coroutines.withContext
++
++@SysUISingleton
++class NetworkSpeedController @Inject constructor(
++    private val connectivityManager: ConnectivityManager,
++    private val secureSettings: SecureSettings,
++    private val keyguardUpdateMonitor: KeyguardUpdateMonitor,
++    private val iconControllerEx: StatusBarIconControllerImplEx,
++    @Background private val bgDispatcher: CoroutineDispatcher,
++    @Main private val mainDispatcher: CoroutineDispatcher,
++) : CoreStartable {
++
++    private var isSwitchOn = false
++    private var isConnected = false
++    private var networkVisibility = false
++
++    private var lastTime = 0L
++    private var lastTotalBytes = 0L
++
++    private val scope = CoroutineScope(bgDispatcher + SupervisorJob())
++    private var speedUpdateJob: Job? = null
++
++    private val networkCallback = object : ConnectivityManager.NetworkCallback() {
++        override fun onAvailable(network: Network) {
++            updateConnectionState(true)
++        }
++
++        override fun onLost(network: Network) {
++            updateConnectionState(false)
++        }
++    }
++
++    override fun start() {
++        connectivityManager.registerDefaultNetworkCallback(networkCallback)
++
++        scope.launch {
++            secureSettings
++                .observerFlow(ICON_HIDE_LIST)
++                .onStart { emit(Unit) }
++                .map { readSwitchState() }
++                .distinctUntilChanged()
++                .flowOn(bgDispatcher)
++                .collect { enabled ->
++                    isSwitchOn = enabled
++                    reset()
++                    restartSpeedUpdates()
++                }
++        }
++
++        keyguardUpdateMonitor.registerCallback(
++            object : KeyguardUpdateMonitorCallback() {
++                override fun onUserSwitchComplete(newUserId: Int) {
++                    isSwitchOn = readSwitchState()
++                    reset()
++                    restartSpeedUpdates()
++                }
++            }
++        )
++    }
++
++    private fun readSwitchState(): Boolean {
++        val iconHideList = secureSettings.getString(ICON_HIDE_LIST)
++        return !iconHideList.isNullOrEmpty()
++            && !iconHideList.contains(SLOT_NETWORK_SPEED)
++    }
++
++    private fun updateConnectionState(connected: Boolean) {
++        isConnected = connected
++        restartSpeedUpdates()
++    }
++
++    private fun restartSpeedUpdates() {
++        speedUpdateJob?.cancel()
++        if (isConnected && isSwitchOn) {
++            speedUpdateJob = scope.launch {
++                while (isActive) {
++                    updateNetworkSpeed()
++                    delay(REFRESH_INTERVAL_MS)
++                }
++            }
++        } else {
++            scope.launch {
++                updateNetworkSpeed()
++            }
++        }
++    }
++
++    private suspend fun updateNetworkSpeed() {
++        val currentTime = System.currentTimeMillis()
++        val totalBytes = getTotalBytes()
++
++        var speed = 0L
++        if (lastTime > 0 && lastTotalBytes > 0 &&
++            totalBytes > lastTotalBytes && currentTime > lastTime
++        ) {
++            speed = (((totalBytes - lastTotalBytes) * 1000) / (currentTime - lastTime)).toLong()
++        }
++
++        val iconState = NetworkSpeedIconState().apply {
++            setVisible(isConnected && isSwitchOn)
++            setSpeedText(speed)
++            setSlot(SLOT_NETWORK_SPEED)
++        }
++
++        withContext(mainDispatcher) {
++            iconControllerEx.setNetworkSpeedIcon(SLOT_NETWORK_SPEED, iconState)
++            if (networkVisibility != iconState.isVisible()) {
++                networkVisibility = iconState.isVisible()
++            }
++        }
++
++        lastTime = currentTime
++        lastTotalBytes = totalBytes
++    }
++
++    private fun getTotalBytes(): Long {
++        val rx = TrafficStats.getTotalRxBytes()
++        val tx = TrafficStats.getTotalTxBytes()
++        return if (rx >= 0 && tx >= 0) rx + tx else 0
++    }
++
++    private fun reset() {
++        lastTime = 0
++        lastTotalBytes = 0
++    }
++
++    fun isSwitchOn(): Boolean = isSwitchOn
++
++    companion object {
++        const val SLOT_NETWORK_SPEED = "network_speed"
++        const val ICON_HIDE_LIST = "icon_blacklist"
++        const val REFRESH_INTERVAL_MS = 4000L
++    }
++}
+diff --git a/packages/SystemUI/src/com/android/systemui/statusbar/policy/networkspeed/NetworkSpeedIconState.kt b/packages/SystemUI/src/com/android/systemui/statusbar/policy/networkspeed/NetworkSpeedIconState.kt
+new file mode 100644
+index 000000000000..2fd1534d9385
+--- /dev/null
++++ b/packages/SystemUI/src/com/android/systemui/statusbar/policy/networkspeed/NetworkSpeedIconState.kt
+@@ -0,0 +1,74 @@
++/*
++ * Copyright (C) 2025-2026 AxionOS Project
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *      http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++package com.android.systemui.statusbar.policy.networkspeed
++
++import java.util.Objects
++
++class NetworkSpeedIconState {
++
++    private var mVisible: Boolean = false
++    private var mSpeedText: Long = 0
++    private var mSlot: String? = null
++
++    override fun equals(other: Any?): Boolean {
++        if (other !is NetworkSpeedIconState) return false
++        return mVisible == other.mVisible &&
++               mSpeedText == other.mSpeedText &&
++               mSlot == other.mSlot
++    }
++
++    override fun hashCode(): Int {
++        return Objects.hash(mVisible, mSpeedText, mSlot)
++    }
++
++    fun setSpeedText(speed: Long) {
++        mSpeedText = speed
++    }
++
++    fun getSpeedText(): Long {
++        return mSpeedText
++    }
++
++    private fun copyTo(target: NetworkSpeedIconState) {
++        target.mVisible = this.mVisible
++        target.mSpeedText = this.mSpeedText
++        target.mSlot = this.mSlot
++    }
++
++    fun setVisible(visible: Boolean) {
++        if (mVisible != visible) {
++            mVisible = visible
++        }
++    }
++
++    fun isVisible(): Boolean {
++        return mVisible
++    }
++
++    fun copy(): NetworkSpeedIconState {
++        val copy = NetworkSpeedIconState()
++        copyTo(copy)
++        return copy
++    }
++
++    fun setSlot(slot: String?) {
++        mSlot = slot
++    }
++
++    override fun toString(): String {
++        return "NetworkSpeedIconState(slot: $mSlot, visible: $mVisible, speed: $mSpeedText)"
++    }
++}
+diff --git a/packages/SystemUI/src/com/android/systemui/statusbar/policy/networkspeed/NetworkSpeedView.kt b/packages/SystemUI/src/com/android/systemui/statusbar/policy/networkspeed/NetworkSpeedView.kt
+new file mode 100644
+index 000000000000..872bb1f4d7b8
+--- /dev/null
++++ b/packages/SystemUI/src/com/android/systemui/statusbar/policy/networkspeed/NetworkSpeedView.kt
+@@ -0,0 +1,268 @@
++/*
++ * Copyright (C) 2025-2026 AxionOS Project
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *      http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++package com.android.systemui.statusbar.policy.networkspeed
++
++import android.content.Context
++import android.graphics.Rect
++import android.util.AttributeSet
++import android.util.Log
++import android.view.Gravity
++import android.view.LayoutInflater
++import android.view.View
++import android.widget.FrameLayout
++import android.widget.TextView
++import com.android.systemui.plugins.DarkIconDispatcher
++import com.android.systemui.res.R
++import com.android.systemui.statusbar.StatusBarIconView
++import com.android.systemui.statusbar.StatusIconDisplayable
++import com.android.systemui.statusbar.policy.NetworkSpeedController
++
++class NetworkSpeedView @JvmOverloads constructor(
++    context: Context,
++    attrs: AttributeSet? = null
++) : FrameLayout(context, attrs), StatusIconDisplayable {
++
++    companion object {
++        private const val TAG = "NetworkSpeedView"
++
++        private const val KB = 1024L
++        private const val MB = KB * 1024
++        private const val GB = MB * 1024
++
++        fun fromContext(context: Context, slot: String, blocked: Boolean, controller: NetworkSpeedController): NetworkSpeedView {
++            val view = LayoutInflater.from(context)
++                .inflate(R.layout.network_speed_view, null) as NetworkSpeedView
++            view.setSlot(slot)
++            view.initDotView()
++            view.isBlocked = blocked
++            view.networkSpeedController = controller
++            return view
++        }
++    }
++
++    private var networkSpeedController: NetworkSpeedController? = null
++    private var isBlocked: Boolean = false
++    private var speedNumber: TextView? = null
++    private var speedUnit: TextView? = null
++    private lateinit var dotView: StatusBarIconView
++    private var slot: String = ""
++    private var speed: Long = 0L
++    private var iconTint: Int = -1
++    private var isStaticDrawableColor: Boolean = false
++    private var visibleState: Int = 0
++    private var layoutLeft: Int = -1
++    private var darkIntensity: Float = 0f
++    private var tintArea: MutableList<Rect> = mutableListOf()
++    private var state: NetworkSpeedIconState? = null
++
++    override fun onFinishInflate() {
++        super.onFinishInflate()
++        speedNumber = findViewById(R.id.number)
++        speedUnit = findViewById(R.id.unit)
++    }
++
++    private fun initDotView() {
++        dotView = StatusBarIconView(context, slot, null)
++        dotView.visibleState = StatusBarIconView.STATE_ICON
++        dotView.visibility = View.GONE
++
++        val size = context.resources.getDimensionPixelSize(R.dimen.status_bar_icon_size)
++        val layoutParams = LayoutParams(size, size).apply {
++            gravity = Gravity.START or Gravity.CENTER_VERTICAL
++        }
++        addView(dotView, layoutParams)
++    }
++
++    private fun updateNetworkSpeed(fullSpeed: String, parts: List<String>) {
++        if (parts.size < 2) return
++        speedNumber?.text = parts[0]
++        speedUnit?.text = parts[1]
++        requestLayout()
++    }
++
++    private fun speedChanged(newSpeed: Long) {
++        if (newSpeed < 0) return
++
++        speed = newSpeed
++        val formatted = formatSpeed(speed)
++        updateNetworkSpeed(formatted, formatted.split(":"))
++    }
++
++    private fun formatSpeed(speed: Long): String {
++        val divisor: Long
++        val unit: String
++        val decimals: Int
++
++        when {
++            speed < 1024 -> {
++                divisor = KB
++                unit = "KB"
++                decimals = 2
++            }
++            speed < 10240 -> {
++                divisor = KB
++                unit = "KB"
++                decimals = 2
++            }
++            speed < 102400 -> {
++                divisor = KB
++                unit = "KB"
++                decimals = 1
++            }
++            speed < 1024000 -> {
++                divisor = KB
++                unit = "KB"
++                decimals = 0
++            }
++            speed < 10485760 -> {
++                divisor = MB
++                unit = "MB"
++                decimals = 2
++            }
++            speed < 104857600 -> {
++                divisor = MB
++                unit = "MB"
++                decimals = 1
++            }
++            speed < 1048576000 -> {
++                divisor = MB
++                unit = "MB"
++                decimals = 0
++            }
++            speed < 10737418240L -> {
++                divisor = GB
++                unit = "GB"
++                decimals = 2
++            }
++            speed < 107374182400L -> {
++                divisor = GB
++                unit = "GB"
++                decimals = 1
++            }
++            else -> {
++                divisor = GB
++                unit = "GB"
++                decimals = 0
++            }
++        }
++
++        val value = divToFractionDigits(speed, divisor, decimals)
++        return "$value:$unit/s"
++    }
++
++    private fun divToFractionDigits(number: Long, divisor: Long, maxNum: Int): String {
++        if (divisor == 0L) {
++            Log.e(TAG, "Cannot divide by zero")
++            return "Error"
++        }
++
++        val whole = number / divisor
++        var remainder = number % divisor
++        val builder = StringBuilder().append(whole)
++
++        if (maxNum > 0) {
++            builder.append(".")
++            repeat(maxNum) {
++                remainder *= 10
++                builder.append(remainder / divisor)
++                remainder %= divisor
++            }
++        }
++
++        return builder.toString()
++    }
++
++    fun setSlot(slot: String) {
++        this.slot = slot
++    }
++
++    override fun getSlot(): String = slot
++
++    override fun setVisibleState(state: Int, animate: Boolean) {
++        if (this.visibleState == state) return
++
++        this.visibleState = state
++        when (state) {
++            0 -> {
++                speedNumber?.visibility = View.VISIBLE
++                speedUnit?.visibility = View.VISIBLE
++                dotView.visibility = View.GONE
++            }
++            1 -> {
++                speedNumber?.visibility = View.INVISIBLE
++                speedUnit?.visibility = View.INVISIBLE
++                dotView.visibility = View.VISIBLE
++            }
++            else -> {
++                speedNumber?.visibility = View.INVISIBLE
++                speedUnit?.visibility = View.INVISIBLE
++                dotView.visibility = View.INVISIBLE
++            }
++        }
++    }
++
++    override fun getVisibleState(): Int = visibleState
++
++    override fun isIconVisible(): Boolean = state?.isVisible() ?: false
++
++    override fun setDecorColor(color: Int) {
++        dotView.setDecorColor(color)
++    }
++
++    fun setIconTint(tint: Int) {
++        speedNumber?.setTextColor(tint)
++        speedUnit?.setTextColor(tint)
++    }
++
++    override fun setStaticDrawableColor(color: Int) {
++        isStaticDrawableColor = true
++        setIconTint(color)
++        dotView.setDecorColor(color)
++    }
++
++    override fun onDarkChanged(area: ArrayList<Rect>, darkIntensity: Float, tint: Int) {
++        if (isStaticDrawableColor) return
++
++        tintArea.clear()
++        tintArea.addAll(area)
++        iconTint = tint
++        this.darkIntensity = darkIntensity
++
++        val appliedTint = DarkIconDispatcher.getTint(area, this, tint)
++        setIconTint(appliedTint)
++        dotView.setDecorColor(tint)
++        dotView.setIconColor(tint, false)
++    }
++
++    fun applyNetworkState(newState: NetworkSpeedIconState?) {
++        if (newState == null) {
++            visibility = View.GONE
++            state = null
++            return
++        }
++
++        state = newState.copy()
++        visibility = if (newState.isVisible()) View.VISIBLE else View.GONE
++
++        if (newState.isVisible()) {
++            speedChanged(newState.getSpeedText())
++        }
++    }
++
++    override fun isIconBlocked(): Boolean {
++        return isBlocked && !(networkSpeedController?.isSwitchOn() ?: false)
++    }
++}

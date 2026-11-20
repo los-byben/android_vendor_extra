@@ -1,0 +1,1583 @@
+From 3f826caa284f9e97a763663492f60d378ae0dd62 Mon Sep 17 00:00:00 2001
+From: Byben <heybyben@gmail.com>
+Date: Sun, 20 Sep 2026 16:41:37 +0700
+Subject: [PATCH] Settings: Redesign about phone
+
+Assisted-by: OpenCode/MuseSpark
+Change-Id: I1446307abb61d75510593132b241c216ff7cf209
+---
+ res/drawable/ic_ram.xml                       |  26 +
+ res/drawable/ic_smartphone_display.xml        |  25 +
+ res/layout/my_device_info_header.xml          | 478 +++++++++++++++
+ res/values/dimens.xml                         |   3 +
+ res/values/strings.xml                        |  20 +
+ res/xml/my_device_info.xml                    |  96 +--
+ .../aboutphone/MyDeviceInfoFragment.java      | 579 ++++++++++++++++--
+ .../aboutphone/StorageUsageView.java          | 138 +++++
+ .../firmwareversion/FirmwareVersionScreen.kt  |   3 -
+ 9 files changed, 1240 insertions(+), 128 deletions(-)
+ create mode 100644 res/drawable/ic_ram.xml
+ create mode 100644 res/drawable/ic_smartphone_display.xml
+ create mode 100644 res/layout/my_device_info_header.xml
+ create mode 100644 src/com/android/settings/deviceinfo/aboutphone/StorageUsageView.java
+
+diff --git a/res/drawable/ic_ram.xml b/res/drawable/ic_ram.xml
+new file mode 100644
+index 00000000000..aced10547b7
+--- /dev/null
++++ b/res/drawable/ic_ram.xml
+@@ -0,0 +1,26 @@
++<?xml version="1.0" encoding="utf-8"?>
++<!--
++    Copyright (C) 2026 The Android Open Source Project
++
++    Licensed under the Apache License, Version 2.0 (the "License");
++    you may not use this file except in compliance with the License.
++    You may obtain a copy of the License at
++
++         http://www.apache.org/licenses/LICENSE-2.0
++
++    Unless required by applicable law or agreed to in writing, software
++    distributed under the License is distributed on an "AS IS" BASIS,
++    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++    See the License for the specific language governing permissions and
++    limitations under the License.
++-->
++<vector xmlns:android="http://schemas.android.com/apk/res/android"
++    android:width="24dp"
++    android:height="24dp"
++    android:viewportWidth="24.0"
++    android:viewportHeight="24.0">
++    <path
++        android:fillColor="@android:color/black"
++        android:fillType="evenOdd"
++        android:pathData="M4,6h16v9h-16zM5.5,7.5h13v6h-13zM7,9.75h2.5v2.5H7zM10.75,9.75h2.5v2.5H10.75zM14.5,9.75h2.5v2.5H14.5zM5,15h2v3H5zM8,15h2v3H8zM11,15h2v3h-2zM15,15h2v3h-2zM18,15h2v3h-2z" />
++</vector>
+diff --git a/res/drawable/ic_smartphone_display.xml b/res/drawable/ic_smartphone_display.xml
+new file mode 100644
+index 00000000000..84962bd4915
+--- /dev/null
++++ b/res/drawable/ic_smartphone_display.xml
+@@ -0,0 +1,25 @@
++<?xml version="1.0" encoding="utf-8"?>
++<!--
++    Copyright (C) 2026 The Android Open Source Project
++
++    Licensed under the Apache License, Version 2.0 (the "License");
++    you may not use this file except in compliance with the License.
++    You may obtain a copy of the License at
++
++         http://www.apache.org/licenses/LICENSE-2.0
++
++    Unless required by applicable law or agreed to in writing, software
++    distributed under the License is distributed on an "AS IS" BASIS,
++    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++    See the License for the specific language governing permissions and
++    limitations under the License.
++-->
++<vector xmlns:android="http://schemas.android.com/apk/res/android"
++    android:width="24dp"
++    android:height="24dp"
++    android:viewportWidth="24.0"
++    android:viewportHeight="24.0">
++    <path
++        android:fillColor="@android:color/black"
++        android:pathData="M17,1.01L7,1c-1.1,0 -2,0.9 -2,2v18c0,1.1 0.9,2 2,2h10c1.1,0 2,-0.9 2,-2V3c0,-1.1 -0.9,-1.99 -2,-1.99zM17,19H7V5h10v14z" />
++</vector>
+diff --git a/res/layout/my_device_info_header.xml b/res/layout/my_device_info_header.xml
+new file mode 100644
+index 00000000000..dbfe2dd4ba5
+--- /dev/null
++++ b/res/layout/my_device_info_header.xml
+@@ -0,0 +1,478 @@
++<?xml version="1.0" encoding="utf-8"?>
++<!--
++    Copyright (C) 2026 The Android Open Source Project
++
++    Licensed under the Apache License, Version 2.0 (the "License");
++    you may not use this file except in compliance with the License.
++    You may obtain a copy of the License at
++
++         http://www.apache.org/licenses/LICENSE-2.0
++
++    Unless required by applicable law or agreed to in writing, software
++    distributed under the License is distributed on an "AS IS" BASIS,
++    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++    See the License for the specific language governing permissions and
++    limitations under the License.
++-->
++
++<LinearLayout
++    xmlns:android="http://schemas.android.com/apk/res/android"
++    xmlns:app="http://schemas.android.com/apk/res-auto"
++    android:layout_width="match_parent"
++    android:layout_height="wrap_content"
++    android:orientation="vertical"
++    android:paddingTop="8dp"
++    android:paddingBottom="4dp">
++
++    <!-- Top banner: current home screen wallpaper with the ROM name on top. -->
++    <com.google.android.material.card.MaterialCardView
++        android:id="@+id/banner_card"
++        android:layout_width="match_parent"
++        android:layout_height="176dp"
++        android:clickable="true"
++        android:focusable="true"
++        app:rippleColor="?android:colorControlHighlight"
++        app:cardBackgroundColor="@color/settingslib_materialColorSurfaceBright"
++        app:cardCornerRadius="28dp"
++        app:cardElevation="0dp">
++
++        <FrameLayout
++            android:layout_width="match_parent"
++            android:layout_height="match_parent">
++
++            <ImageView
++                android:id="@+id/banner_wallpaper"
++                android:layout_width="match_parent"
++                android:layout_height="match_parent"
++                android:scaleType="centerCrop"
++                android:contentDescription="@null" />
++
++            <TextView
++                android:id="@+id/banner_title"
++                android:layout_width="wrap_content"
++                android:layout_height="wrap_content"
++                android:layout_gravity="center"
++                android:text="@string/my_device_info_banner_title"
++                android:textColor="@android:color/white"
++                android:textSize="34sp"
++                android:textStyle="bold" />
++
++        </FrameLayout>
++
++    </com.google.android.material.card.MaterialCardView>
++
++    <LinearLayout
++        android:layout_width="match_parent"
++        android:layout_height="wrap_content"
++        android:layout_marginTop="12dp"
++        android:orientation="horizontal">
++
++        <!-- Device name card. Tapping it opens the rename dialog. -->
++        <com.google.android.material.card.MaterialCardView
++            android:id="@+id/device_name_card"
++            android:layout_width="0dp"
++            android:layout_height="wrap_content"
++            android:layout_weight="1"
++            android:layout_marginEnd="6dp"
++            app:cardElevation="0dp"
++            android:clickable="true"
++            android:focusable="true"
++            app:rippleColor="?android:colorControlHighlight"
++            app:cardBackgroundColor="@color/settingslib_materialColorSurfaceBright"
++            app:cardCornerRadius="20dp">
++
++            <LinearLayout
++                android:layout_width="match_parent"
++                android:layout_height="wrap_content"
++                android:orientation="vertical"
++                android:padding="16dp">
++
++                <FrameLayout
++                    android:layout_width="44dp"
++                    android:layout_height="44dp">
++
++                    <ImageView
++                        android:layout_width="match_parent"
++                        android:layout_height="match_parent"
++                        android:src="@drawable/suggestion_icon_background" />
++
++                    <ImageView
++                        android:layout_width="24dp"
++                        android:layout_height="24dp"
++                        android:layout_gravity="center"
++                        android:src="@drawable/ic_devices_other_32dp"
++                        android:tint="?android:attr/textColorSecondary" />
++
++                </FrameLayout>
++
++                <TextView
++                    android:layout_width="wrap_content"
++                    android:layout_height="wrap_content"
++                    android:layout_marginTop="12dp"
++                    android:text="@string/my_device_info_device_name_preference_title"
++                    android:textColor="?android:attr/textColorSecondary"
++                    android:textAppearance="?android:attr/textAppearanceListItemSecondary" />
++
++                <TextView
++                    android:id="@+id/device_name_value"
++                    android:layout_width="match_parent"
++                    android:layout_height="wrap_content"
++                    android:layout_marginTop="2dp"
++                    android:ellipsize="end"
++                    android:singleLine="true"
++                    android:textColor="?android:attr/textColorPrimary"
++                    android:textAppearance="?android:attr/textAppearanceListItem" />
++
++            </LinearLayout>
++
++        </com.google.android.material.card.MaterialCardView>
++
++        <!-- LineageOS version card. -->
++        <com.google.android.material.card.MaterialCardView
++            android:id="@+id/android_version_card"
++            android:layout_width="0dp"
++            android:layout_height="match_parent"
++            android:layout_weight="1"
++            android:layout_marginStart="6dp"
++            app:cardElevation="0dp"
++            android:clickable="true"
++            android:focusable="true"
++            app:rippleColor="?android:colorControlHighlight"
++            app:cardBackgroundColor="@color/settingslib_materialColorSurfaceBright"
++            app:cardCornerRadius="20dp">
++
++            <LinearLayout
++                android:layout_width="match_parent"
++                android:layout_height="wrap_content"
++                android:orientation="vertical"
++                android:padding="16dp">
++
++                <FrameLayout
++                    android:layout_width="44dp"
++                    android:layout_height="44dp">
++
++                    <ImageView
++                        android:layout_width="match_parent"
++                        android:layout_height="match_parent"
++                        android:src="@drawable/suggestion_icon_background" />
++
++                    <ImageView
++                        android:layout_width="24dp"
++                        android:layout_height="24dp"
++                        android:layout_gravity="center"
++                        android:src="@drawable/ic_info_outline_24"
++                        android:tint="?android:attr/textColorSecondary" />
++
++                </FrameLayout>
++
++                    <TextView
++                        android:layout_width="wrap_content"
++                        android:layout_height="wrap_content"
++                        android:layout_marginTop="12dp"
++                        android:text="@string/firmware_version"
++                        android:textColor="?android:attr/textColorSecondary"
++                        android:textAppearance="?android:attr/textAppearanceListItemSecondary" />
++
++                    <TextView
++                        android:id="@+id/android_version_value"
++                    android:layout_width="match_parent"
++                    android:layout_height="wrap_content"
++                    android:layout_marginTop="2dp"
++                    android:ellipsize="end"
++                    android:singleLine="true"
++                    android:textColor="?android:attr/textColorPrimary"
++                    android:textAppearance="?android:attr/textAppearanceListItem" />
++
++            </LinearLayout>
++
++        </com.google.android.material.card.MaterialCardView>
++
++    </LinearLayout>
++
++    <!-- Storage usage bar. Tapping it opens the Storage settings page. -->
++    <com.google.android.material.card.MaterialCardView
++        android:id="@+id/storage_card"
++        android:layout_width="match_parent"
++        android:layout_height="wrap_content"
++        android:layout_marginTop="12dp"
++        android:clickable="true"
++        android:focusable="true"
++        app:rippleColor="?android:colorControlHighlight"
++        app:cardBackgroundColor="@color/settingslib_materialColorSurfaceBright"
++        app:cardCornerRadius="20dp"
++        app:cardElevation="0dp">
++
++        <FrameLayout
++            android:layout_width="match_parent"
++            android:layout_height="64dp">
++
++            <com.android.settings.deviceinfo.aboutphone.StorageUsageView
++                android:id="@+id/storage_wave"
++                android:layout_width="match_parent"
++                android:layout_height="match_parent" />
++
++            <LinearLayout
++                android:layout_width="match_parent"
++                android:layout_height="match_parent"
++                android:gravity="center_vertical"
++                android:orientation="horizontal"
++                android:paddingStart="16dp"
++                android:paddingEnd="16dp">
++
++                <FrameLayout
++                    android:layout_width="44dp"
++                    android:layout_height="44dp"
++                    android:layout_marginEnd="12dp">
++
++                    <ImageView
++                        android:layout_width="match_parent"
++                        android:layout_height="match_parent"
++                        android:src="@drawable/suggestion_icon_background" />
++
++                    <ImageView
++                        android:layout_width="24dp"
++                        android:layout_height="24dp"
++                        android:layout_gravity="center"
++                        android:src="@drawable/ic_storage"
++                        android:tint="?android:attr/textColorSecondary" />
++
++                </FrameLayout>
++
++                <TextView
++                    android:layout_width="wrap_content"
++                    android:layout_height="wrap_content"
++                    android:text="@string/my_device_info_storage_title"
++                    android:textColor="?android:attr/textColorPrimary"
++                    android:textAppearance="?android:attr/textAppearanceListItem" />
++
++                <Space
++                    android:layout_width="0dp"
++                    android:layout_height="match_parent"
++                    android:layout_weight="1" />
++
++                <TextView
++                    android:id="@+id/storage_value"
++                    android:layout_width="wrap_content"
++                    android:layout_height="wrap_content"
++                    android:textColor="?android:attr/textColorPrimary"
++                    android:textAppearance="?android:attr/textAppearanceListItem" />
++
++            </LinearLayout>
++
++        </FrameLayout>
++
++    </com.google.android.material.card.MaterialCardView>
++
++    <!-- Device specifications grid. -->
++    <com.google.android.material.card.MaterialCardView
++        android:layout_width="match_parent"
++        android:layout_height="wrap_content"
++        android:layout_marginTop="12dp"
++        app:cardBackgroundColor="@color/settingslib_materialColorSurfaceBright"
++        app:cardCornerRadius="20dp"
++        app:cardElevation="0dp">
++
++        <LinearLayout
++            android:layout_width="match_parent"
++            android:layout_height="wrap_content"
++            android:orientation="vertical"
++            android:padding="16dp">
++
++            <LinearLayout
++                android:layout_width="match_parent"
++                android:layout_height="wrap_content"
++                android:orientation="horizontal">
++
++                <LinearLayout
++                    android:layout_width="0dp"
++                    android:layout_height="wrap_content"
++                    android:layout_weight="1"
++                    android:orientation="vertical">
++
++                    <FrameLayout
++                        android:layout_width="44dp"
++                        android:layout_height="44dp">
++
++                        <ImageView
++                            android:layout_width="match_parent"
++                            android:layout_height="match_parent"
++                            android:src="@drawable/suggestion_icon_background" />
++
++                        <ImageView
++                            android:layout_width="24dp"
++                            android:layout_height="24dp"
++                            android:layout_gravity="center"
++                            android:src="@drawable/ic_settings_memory"
++                            android:tint="?android:attr/textColorSecondary" />
++
++                    </FrameLayout>
++
++                    <TextView
++                        android:layout_width="wrap_content"
++                        android:layout_height="wrap_content"
++                        android:layout_marginTop="12dp"
++                        android:text="@string/my_device_info_spec_processor"
++                        android:textColor="?android:attr/textColorSecondary"
++                        android:textAppearance="?android:attr/textAppearanceListItemSecondary" />
++
++                    <TextView
++                        android:id="@+id/spec_processor"
++                        android:layout_width="match_parent"
++                        android:layout_height="wrap_content"
++                        android:layout_marginTop="2dp"
++                        android:ellipsize="end"
++                        android:singleLine="true"
++                        android:textColor="?android:attr/textColorPrimary"
++                        android:textAppearance="?android:attr/textAppearanceListItem" />
++
++                </LinearLayout>
++
++                <LinearLayout
++                    android:layout_width="0dp"
++                    android:layout_height="wrap_content"
++                    android:layout_marginStart="44dp"
++                    android:layout_weight="1"
++                    android:orientation="vertical">
++
++                    <FrameLayout
++                        android:layout_width="44dp"
++                        android:layout_height="44dp">
++
++                        <ImageView
++                            android:layout_width="match_parent"
++                            android:layout_height="match_parent"
++                            android:src="@drawable/suggestion_icon_background" />
++
++                        <ImageView
++                            android:layout_width="24dp"
++                            android:layout_height="24dp"
++                            android:layout_gravity="center"
++                            android:src="@drawable/ic_smartphone_display"
++                            android:tint="?android:attr/textColorSecondary" />
++
++                    </FrameLayout>
++
++                    <TextView
++                        android:layout_width="wrap_content"
++                        android:layout_height="wrap_content"
++                        android:layout_marginTop="12dp"
++                        android:text="@string/my_device_info_spec_display"
++                        android:textColor="?android:attr/textColorSecondary"
++                        android:textAppearance="?android:attr/textAppearanceListItemSecondary" />
++
++                    <TextView
++                        android:id="@+id/spec_display"
++                        android:layout_width="match_parent"
++                        android:layout_height="wrap_content"
++                        android:layout_marginTop="2dp"
++                        android:ellipsize="end"
++                        android:singleLine="true"
++                        android:textColor="?android:attr/textColorPrimary"
++                        android:textAppearance="?android:attr/textAppearanceListItem" />
++
++                </LinearLayout>
++
++            </LinearLayout>
++
++            <LinearLayout
++                android:layout_width="match_parent"
++                android:layout_height="wrap_content"
++                android:layout_marginTop="16dp"
++                android:orientation="horizontal">
++
++                <LinearLayout
++                    android:layout_width="0dp"
++                    android:layout_height="wrap_content"
++                    android:layout_weight="1"
++                    android:orientation="vertical">
++
++                    <FrameLayout
++                        android:layout_width="44dp"
++                        android:layout_height="44dp">
++
++                        <ImageView
++                            android:layout_width="match_parent"
++                            android:layout_height="match_parent"
++                            android:src="@drawable/suggestion_icon_background" />
++
++                        <ImageView
++                            android:layout_width="24dp"
++                            android:layout_height="24dp"
++                            android:layout_gravity="center"
++                            android:src="@drawable/ic_ram"
++                            android:tint="?android:attr/textColorSecondary" />
++
++                    </FrameLayout>
++
++                    <TextView
++                        android:layout_width="wrap_content"
++                        android:layout_height="wrap_content"
++                        android:layout_marginTop="12dp"
++                        android:text="@string/my_device_info_spec_ram"
++                        android:textColor="?android:attr/textColorSecondary"
++                        android:textAppearance="?android:attr/textAppearanceListItemSecondary" />
++
++                    <TextView
++                        android:id="@+id/spec_ram"
++                        android:layout_width="match_parent"
++                        android:layout_height="wrap_content"
++                        android:layout_marginTop="2dp"
++                        android:ellipsize="end"
++                        android:singleLine="true"
++                        android:textColor="?android:attr/textColorPrimary"
++                        android:textAppearance="?android:attr/textAppearanceListItem" />
++
++                </LinearLayout>
++
++            <LinearLayout
++                android:layout_width="0dp"
++                android:layout_height="wrap_content"
++                android:layout_marginStart="44dp"
++                android:layout_weight="1"
++                android:orientation="vertical">
++
++                <FrameLayout
++                    android:layout_width="44dp"
++                    android:layout_height="44dp">
++
++                    <ImageView
++                        android:layout_width="match_parent"
++                        android:layout_height="match_parent"
++                        android:src="@drawable/suggestion_icon_background" />
++
++                    <ImageView
++                        android:layout_width="24dp"
++                        android:layout_height="24dp"
++                        android:layout_gravity="center"
++                        android:src="@drawable/ic_battery_full"
++                        android:tint="?android:attr/textColorSecondary" />
++
++                    </FrameLayout>
++
++                    <TextView
++                        android:layout_width="wrap_content"
++                        android:layout_height="wrap_content"
++                        android:layout_marginTop="12dp"
++                        android:text="@string/my_device_info_spec_battery"
++                        android:textColor="?android:attr/textColorSecondary"
++                        android:textAppearance="?android:attr/textAppearanceListItemSecondary" />
++
++                    <TextView
++                        android:id="@+id/spec_battery"
++                        android:layout_width="match_parent"
++                        android:layout_height="wrap_content"
++                        android:layout_marginTop="2dp"
++                        android:ellipsize="end"
++                        android:singleLine="true"
++                        android:textColor="?android:attr/textColorPrimary"
++                        android:textAppearance="?android:attr/textAppearanceListItem" />
++
++                </LinearLayout>
++
++            </LinearLayout>
++
++        </LinearLayout>
++
++    </com.google.android.material.card.MaterialCardView>
++
++</LinearLayout>
+diff --git a/res/values/dimens.xml b/res/values/dimens.xml
+index af8c624c749..3d8fe44e002 100644
+--- a/res/values/dimens.xml
++++ b/res/values/dimens.xml
+@@ -244,6 +244,9 @@
+     <dimen name="admin_details_dialog_title_bottom_padding">16dp</dimen>
+     <dimen name="admin_details_dialog_icon_size">32dp</dimen>
+ 
++    <!-- About phone device name edit dialog. -->
++    <dimen name="about_phone_device_name_dialog_padding">24dp</dimen>
++
+     <!-- Display, Screen zoom -->
+     <dimen name="conversation_message_list_padding">10dp</dimen>
+     <dimen name="conversation_message_contact_icon_text_size">32sp</dimen>
+diff --git a/res/values/strings.xml b/res/values/strings.xml
+index ac692e4cb3c..5f20de4c1a8 100644
+--- a/res/values/strings.xml
++++ b/res/values/strings.xml
+@@ -13094,6 +13094,26 @@
+     <string name="my_device_info_account_preference_summary">%d accounts</string>
+     <!-- Title for preference showing the name of the device. [CHAR LIMIT=60]-->
+     <string name="my_device_info_device_name_preference_title">Device name</string>
++    <!-- Title shown centered on the About phone wallpaper banner. [CHAR LIMIT=30]-->
++    <string name="my_device_info_banner_title">LineageOS</string>
++    <!-- Title of the dialog used to edit the About phone banner title. [CHAR LIMIT=60]-->
++    <string name="my_device_info_banner_title_dialog_title">Edit banner title</string>
++    <!-- Title for the About phone storage usage card. [CHAR LIMIT=30]-->
++    <string name="my_device_info_storage_title">Storage</string>
++    <!-- Storage usage value: used GB over total GB. [CHAR LIMIT=30]-->
++    <string name="my_device_info_storage_used">%1$d/%2$d GB Used</string>
++    <!-- About phone specification labels. [CHAR LIMIT=30]-->
++    <string name="my_device_info_spec_processor">Processor</string>
++    <string name="my_device_info_spec_ram">RAM</string>
++    <string name="my_device_info_spec_display">Display</string>
++    <string name="my_device_info_spec_battery">Battery</string>
++    <!-- RAM size in GB. [CHAR LIMIT=15]-->
++    <string name="my_device_info_ram_size">%d GB</string>
++    <!-- Title for the preference that expands the hidden device info sections. -->
++    <string name="my_device_info_others_title">Others</string>
++    <!-- Summary shown when the extra sections are hidden / shown. -->
++    <string name="my_device_info_others_summary_show">Tap to show more info</string>
++    <string name="my_device_info_others_summary_hide">Tap to hide</string>
+ 
+     <!-- Title for preference category showing the name of basic info. [CHAR LIMIT=60]-->
+     <string name="my_device_info_basic_info_category_title">Basic info</string>
+diff --git a/res/xml/my_device_info.xml b/res/xml/my_device_info.xml
+index 9148a9d23f1..e5fe26fd74b 100644
+--- a/res/xml/my_device_info.xml
++++ b/res/xml/my_device_info.xml
+@@ -23,75 +23,14 @@
+ 
+     <com.android.settingslib.widget.LayoutPreference
+         android:key="my_device_info_header"
+-        android:layout="@layout/settings_entity_header"
+-        android:selectable="false"
+-        settings:isPreferenceVisible="false"/>
+-
+-    <PreferenceCategory
+-        android:key="basic_info_category"
+-        android:selectable="false"
+-        android:title="@string/my_device_info_basic_info_category_title">
+-
+-        <!-- Device name -->
+-        <com.android.settings.widget.ValidatedEditTextPreference
+-            android:key="device_name"
+-            android:order="1"
+-            android:title="@string/my_device_info_device_name_preference_title"
+-            android:summary="@string/summary_placeholder"
+-            settings:controller="com.android.settings.deviceinfo.DeviceNamePreferenceController"
+-            settings:enableCopying="true"/>
+-
+-        <!-- Account name -->
+-        <Preference
+-            android:key="branded_account"
+-            android:order="2"
+-            android:title="@string/my_device_info_account_preference_title"
+-            android:summary="@string/summary_placeholder"
+-            settings:enableCopying="true"
+-            settings:controller="com.android.settings.deviceinfo.BrandedAccountPreferenceController"/>
+-
+-        <!-- Phone number -->
+-        <Preference
+-            android:key="phone_number"
+-            android:order="3"
+-            android:title="@string/status_number"
+-            android:summary="@string/summary_placeholder"
+-            settings:isPreferenceVisible="@bool/config_show_sim_info"
+-            settings:controller="com.android.settings.deviceinfo.PhoneNumberPreferenceController"
+-            settings:enableCopying="true"/>
+-    </PreferenceCategory>
+-
+-    <PreferenceCategory
+-        android:key="legal_category"
+-        android:title="@string/my_device_info_legal_category_title">
+-
+-        <!-- Legal information -->
+-        <Preference
+-            android:key="legal_container"
+-            android:order="15"
+-            android:title="@string/legal_information"
+-            android:fragment="com.android.settings.LegalSettings"/>
+-
+-        <!-- Regulatory labels -->
+-        <Preference
+-            android:key="regulatory_info"
+-            android:order="16"
+-            android:title="@string/regulatory_labels">
+-            <intent android:action="android.settings.SHOW_REGULATORY_INFO"
+-                    android:targetPackage="${applicationId}"/>
+-        </Preference>
+-
+-        <!-- Safety & regulatory manual -->
+-        <Preference
+-            android:key="safety_info"
+-            android:order="18"
+-            android:title="@string/safety_and_regulatory_info"/>
+-    </PreferenceCategory>
++        android:layout="@layout/my_device_info_header"
++        android:selectable="false"/>
+ 
+     <PreferenceCategory
+         android:key="device_detail_category"
+         android:selectable="false"
+-        android:title="@string/my_device_info_device_details_category_title">
++        android:title="@string/my_device_info_device_details_category_title"
++        settings:isPreferenceVisible="false">
+ 
+         <!-- SIM status -->
+         <Preference
+@@ -135,29 +74,12 @@
+             settings:enableCopying="true"
+             settings:isPreferenceVisible="@bool/config_show_sim_info"
+             settings:controller="com.android.settings.deviceinfo.imei.ImeiInfoPreferenceController"/>
+-
+-        <!-- Android version -->
+-        <Preference
+-            android:key="firmware_version"
+-            android:order="42"
+-            android:title="@string/firmware_version"
+-            android:summary="@string/summary_placeholder"
+-            android:fragment="com.android.settings.deviceinfo.firmwareversion.FirmwareVersionSettings"
+-            settings:controller="com.android.settings.deviceinfo.firmwareversion.FirmwareVersionPreferenceController"/>
+-
+-        <!-- Lineage version -->
+-        <Preference
+-            android:key="lineage_os_version"
+-            android:order="43"
+-            android:title="@*lineageos.platform:string/lineage_version"
+-            android:summary="@string/summary_placeholder"
+-            settings:enableCopying="true"
+-            settings:controller="com.android.settings.deviceinfo.firmwareversion.LineageVersionDetailPreferenceController"/>
+     </PreferenceCategory>
+ 
+     <PreferenceCategory
+         android:key="device_identifiers_category"
+-        android:title="@string/my_device_info_device_identifiers_category_title">
++        android:title="@string/my_device_info_device_identifiers_category_title"
++        settings:isPreferenceVisible="false">
+ 
+         <!--IP address -->
+         <Preference
+@@ -236,4 +158,10 @@
+             settings:controller="com.android.settings.deviceinfo.BuildNumberPreferenceController"/>
+     </PreferenceCategory>
+ 
++    <!-- Toggle that expands/collapses the sections above. -->
++    <Preference
++        android:key="others_section_toggle"
++        android:title="@string/my_device_info_others_title"
++        android:summary="@string/my_device_info_others_summary_show"/>
++
+ </PreferenceScreen>
+diff --git a/src/com/android/settings/deviceinfo/aboutphone/MyDeviceInfoFragment.java b/src/com/android/settings/deviceinfo/aboutphone/MyDeviceInfoFragment.java
+index 21c6daa87ae..64ed106e35f 100644
+--- a/src/com/android/settings/deviceinfo/aboutphone/MyDeviceInfoFragment.java
++++ b/src/com/android/settings/deviceinfo/aboutphone/MyDeviceInfoFragment.java
+@@ -18,31 +18,53 @@ package com.android.settings.deviceinfo.aboutphone;
+ 
+ import static androidx.core.content.ContextCompat.getMainExecutor;
+ 
+-import android.app.Activity;
++import android.app.ActivityManager;
++import android.app.WallpaperManager;
+ import android.app.settings.SettingsEnums;
++import android.content.BroadcastReceiver;
+ import android.content.Context;
+ import android.content.Intent;
+-import android.content.pm.UserInfo;
++import android.content.IntentFilter;
++import android.database.ContentObserver;
++import android.graphics.Rect;
++import android.graphics.drawable.Drawable;
++import android.os.BatteryManager;
++import android.os.Build;
+ import android.os.Bundle;
+-import android.os.UserManager;
++import android.os.Handler;
++import android.os.Looper;
++import android.os.SystemProperties;
++import android.os.storage.StorageManager;
++import android.provider.Settings;
++import android.text.InputType;
++import android.text.TextUtils;
++import android.util.Log;
+ import android.view.View;
++import android.view.ViewGroup;
++import android.view.WindowManager;
++import android.widget.EditText;
++import android.widget.FrameLayout;
++import android.widget.ImageView;
++import android.widget.TextView;
+ 
+ import androidx.annotation.NonNull;
+ import androidx.annotation.Nullable;
++import androidx.appcompat.app.AlertDialog;
++import androidx.preference.Preference;
+ import androidx.preference.PreferenceScreen;
++import androidx.recyclerview.widget.RecyclerView;
+ 
+ import com.android.settings.R;
+-import com.android.settings.Utils;
++import com.android.settings.core.SubSettingLauncher;
+ import com.android.settings.dashboard.DashboardFragment;
+ import com.android.settings.deviceinfo.BluetoothAddressPreferenceController;
+ import com.android.settings.deviceinfo.BuildNumberPreferenceController;
+-import com.android.settings.deviceinfo.DeviceNamePreferenceController;
+ import com.android.settings.deviceinfo.FccEquipmentIdPreferenceController;
++import com.android.settings.deviceinfo.StorageDashboardFragment;
++import com.android.settings.deviceinfo.firmwareversion.FirmwareVersionSettings;
+ import com.android.settings.deviceinfo.FeedbackPreferenceController;
+ import com.android.settings.deviceinfo.IpAddressPreferenceController;
+ import com.android.settings.deviceinfo.ManualPreferenceController;
+-import com.android.settings.deviceinfo.RegulatoryInfoPreferenceController;
+-import com.android.settings.deviceinfo.SafetyInfoPreferenceController;
+ import com.android.settings.deviceinfo.UptimePreferenceController;
+ import com.android.settings.deviceinfo.WifiMacAddressPreferenceController;
+ import com.android.settings.deviceinfo.imei.ImeiInfoPreferenceController;
+@@ -52,10 +74,14 @@ import com.android.settings.deviceinfo.simstatus.SimStatusPreferenceController;
+ import com.android.settings.deviceinfo.simstatus.SlotSimStatus;
+ import com.android.settings.flags.Flags;
+ import com.android.settings.search.BaseSearchIndexProvider;
+-import com.android.settings.widget.EntityHeaderController;
++import com.android.settings.wifi.tether.WifiDeviceNameTextValidator;
++import com.android.settingslib.deviceinfo.PrivateStorageInfo;
++import com.android.settingslib.deviceinfo.StorageManagerVolumeProvider;
++import com.android.settingslib.fuelgauge.BatteryUtils;
+ import com.android.settingslib.core.AbstractPreferenceController;
+ import com.android.settingslib.core.lifecycle.Lifecycle;
+ import com.android.settingslib.search.SearchIndexable;
++import com.android.settingslib.utils.ThreadUtils;
+ import com.android.settingslib.widget.LayoutPreference;
+ 
+ import java.util.ArrayList;
+@@ -68,15 +94,58 @@ import java.util.function.Consumer;
+ 
+ // LINT.IfChange
+ @SearchIndexable
+-public class MyDeviceInfoFragment extends DashboardFragment
+-        implements DeviceNamePreferenceController.DeviceNamePreferenceHost {
++public class MyDeviceInfoFragment extends DashboardFragment {
+ 
+     private static final String LOG_TAG = "MyDeviceInfoFragment";
+     private static final String KEY_EID_INFO = "eid_info";
+     private static final String KEY_MY_DEVICE_INFO_HEADER = "my_device_info_header";
++    private static final String KEY_DEVICE_DETAIL_CATEGORY = "device_detail_category";
++    private static final String KEY_DEVICE_IDENTIFIERS_CATEGORY = "device_identifiers_category";
++    private static final String KEY_OTHERS_TOGGLE = "others_section_toggle";
++    private static final String SETTINGS_KEY_BANNER_TITLE = "my_device_info_banner_title";
+ 
+     private BuildNumberPreferenceController mBuildNumberPreferenceController;
+ 
++    private ImageView mBannerWallpaperView;
++    private TextView mBannerTitleView;
++    private View mBannerCard;
++    private TextView mDeviceNameValueView;
++    private View mDeviceNameCard;
++    private StorageUsageView mStorageWave;
++    private TextView mStorageValue;
++    private BroadcastReceiver mWallpaperChangedReceiver;
++    private ContentObserver mDeviceNameObserver;
++    private String mPendingDeviceName;
++    private boolean mExtraSectionsShown;
++
++    private final RecyclerView.AdapterDataObserver mVisibilityEnforcer =
++            new RecyclerView.AdapterDataObserver() {
++                @Override
++                public void onChanged() {
++                    applyExtraSectionsVisibility();
++                }
++
++                @Override
++                public void onItemRangeChanged(int positionStart, int itemCount) {
++                    applyExtraSectionsVisibility();
++                }
++
++                @Override
++                public void onItemRangeInserted(int positionStart, int itemCount) {
++                    applyExtraSectionsVisibility();
++                }
++
++                @Override
++                public void onItemRangeRemoved(int positionStart, int itemCount) {
++                    applyExtraSectionsVisibility();
++                }
++
++                @Override
++                public void onItemRangeMoved(int fromPosition, int toPosition, int itemCount) {
++                    applyExtraSectionsVisibility();
++                }
++            };
++
+     @Override
+     public int getMetricsCategory() {
+         return SettingsEnums.DEVICEINFO;
+@@ -90,7 +159,6 @@ public class MyDeviceInfoFragment extends DashboardFragment
+     @Override
+     public void onAttach(Context context) {
+         super.onAttach(context);
+-        use(DeviceNamePreferenceController.class).setHost(this /* parent */);
+         mBuildNumberPreferenceController = use(BuildNumberPreferenceController.class);
+         mBuildNumberPreferenceController.setHost(this /* parent */);
+     }
+@@ -110,12 +178,86 @@ public class MyDeviceInfoFragment extends DashboardFragment
+             // remove the preference created from resource to avoid duplicated key
+             preferenceScreen.removePreferenceRecursively(KEY_EID_INFO);
+         }
++        final Preference othersToggle = preferenceScreen.findPreference(KEY_OTHERS_TOGGLE);
++        if (othersToggle != null) {
++            othersToggle.setOnPreferenceClickListener(preference -> {
++                toggleExtraSections();
++                return true;
++            });
++        }
++    }
++
++    private void toggleExtraSections() {
++        mExtraSectionsShown = !mExtraSectionsShown;
++        applyExtraSectionsVisibility();
++    }
++
++    private void applyExtraSectionsVisibility() {
++        final PreferenceScreen screen = getPreferenceScreen();
++        if (screen == null) {
++            return;
++        }
++        final Preference details = screen.findPreference(KEY_DEVICE_DETAIL_CATEGORY);
++        final Preference identifiers = screen.findPreference(KEY_DEVICE_IDENTIFIERS_CATEGORY);
++        final Preference toggle = screen.findPreference(KEY_OTHERS_TOGGLE);
++        // Guard each write so our own enforcement doesn't re-trigger the adapter observer.
++        if (details != null && details.isVisible() != mExtraSectionsShown) {
++            details.setVisible(mExtraSectionsShown);
++        }
++        if (identifiers != null && identifiers.isVisible() != mExtraSectionsShown) {
++            identifiers.setVisible(mExtraSectionsShown);
++        }
++        if (toggle != null) {
++            final CharSequence summary = getString(mExtraSectionsShown
++                    ? R.string.my_device_info_others_summary_hide
++                    : R.string.my_device_info_others_summary_show);
++            if (!TextUtils.equals(toggle.getSummary(), summary)) {
++                toggle.setSummary(summary);
++            }
++        }
+     }
+ 
+     @Override
+     public void onStart() {
+         super.onStart();
+         initHeader();
++        registerHeaderObservers();
++    }
++
++    @Override
++    public void onResume() {
++        super.onResume();
++        // Enforce the collapsed state: something re-shows the detail category on
++        // initial load, ignoring the XML flag. Re-applying here wins over it.
++        applyExtraSectionsVisibility();
++        final RecyclerView listView = getListView();
++        if (listView != null && listView.getAdapter() != null) {
++            try {
++                listView.getAdapter().unregisterAdapterDataObserver(mVisibilityEnforcer);
++            } catch (IllegalStateException ignored) {
++                // Not registered yet.
++            }
++            listView.getAdapter().registerAdapterDataObserver(mVisibilityEnforcer);
++        }
++    }
++
++    @Override
++    public void onPause() {
++        final RecyclerView listView = getListView();
++        if (listView != null && listView.getAdapter() != null) {
++            try {
++                listView.getAdapter().unregisterAdapterDataObserver(mVisibilityEnforcer);
++            } catch (IllegalStateException ignored) {
++                // Already unregistered.
++            }
++        }
++        super.onPause();
++    }
++
++    @Override
++    public void onStop() {
++        unregisterHeaderObservers();
++        super.onStop();
+     }
+ 
+     @Override
+@@ -148,8 +290,6 @@ public class MyDeviceInfoFragment extends DashboardFragment
+         controllers.add(new IpAddressPreferenceController(context, lifecycle));
+         controllers.add(new WifiMacAddressPreferenceController(context, lifecycle));
+         controllers.add(new BluetoothAddressPreferenceController(context, lifecycle));
+-        controllers.add(new RegulatoryInfoPreferenceController(context));
+-        controllers.add(new SafetyInfoPreferenceController(context));
+         controllers.add(new ManualPreferenceController(context));
+         controllers.add(new FeedbackPreferenceController(fragment, context));
+         controllers.add(new FccEquipmentIdPreferenceController(context));
+@@ -204,47 +344,404 @@ public class MyDeviceInfoFragment extends DashboardFragment
+     }
+ 
+     private void initHeader() {
+-        // TODO: Migrate into its own controller.
++        final PreferenceScreen screen = getPreferenceScreen();
++        if (screen == null) {
++            return;
++        }
+         final LayoutPreference headerPreference =
+-                getPreferenceScreen().findPreference(KEY_MY_DEVICE_INFO_HEADER);
+-        final boolean shouldDisplayHeader = getContext().getResources().getBoolean(
+-                R.bool.config_show_device_header_in_device_info);
+-        headerPreference.setVisible(shouldDisplayHeader);
+-        if (!shouldDisplayHeader) {
++                screen.findPreference(KEY_MY_DEVICE_INFO_HEADER);
++        if (headerPreference == null) {
+             return;
+         }
+-        final View headerView = headerPreference.findViewById(R.id.entity_header);
+-        final Activity context = getActivity();
+-        final Bundle bundle = getArguments();
+-        final EntityHeaderController controller = EntityHeaderController
+-                .newInstance(context, this, headerView)
+-                .setButtonActions(EntityHeaderController.ActionType.ACTION_NONE,
+-                        EntityHeaderController.ActionType.ACTION_NONE);
++        headerPreference.setVisible(true);
++
++        mBannerWallpaperView = headerPreference.findViewById(R.id.banner_wallpaper);
++        updateBannerWallpaper();
++
++        mBannerTitleView = headerPreference.findViewById(R.id.banner_title);
++        mBannerCard = headerPreference.findViewById(R.id.banner_card);
++        updateBannerTitle();
++        if (mBannerCard != null) {
++            // Tapping the banner opens the dialog for editing its title.
++            mBannerCard.setOnClickListener(v -> showBannerTitleEditDialog());
++        }
+ 
+-        // TODO: There may be an avatar setting action we can use here.
+-        final int iconId = bundle != null ? bundle.getInt("icon_id", 0) : 0;
+-        if (iconId == 0) {
+-            final UserManager userManager = (UserManager) getActivity().getSystemService(
+-                    Context.USER_SERVICE);
+-            final UserInfo info = Utils.getExistingUser(userManager,
+-                    android.os.Process.myUserHandle());
+-            controller.setLabel(info.name);
+-            controller.setIcon(
+-                    com.android.settingslib.Utils.getUserIcon(getActivity(), userManager, info));
++        mDeviceNameValueView = headerPreference.findViewById(R.id.device_name_value);
++        mDeviceNameCard = headerPreference.findViewById(R.id.device_name_card);
++        updateDeviceNameCard();
++        if (mDeviceNameCard != null) {
++            // Tapping the card opens the rename dialog.
++            mDeviceNameCard.setOnClickListener(v -> showDeviceNameEditDialog());
+         }
+ 
+-        controller.done(true /* rebindActions */);
++        final TextView versionValue = headerPreference.findViewById(R.id.android_version_value);
++        if (versionValue != null) {
++            versionValue.setText(Build.VERSION.RELEASE_OR_PREVIEW_DISPLAY);
++        }
++        final View versionCard = headerPreference.findViewById(R.id.android_version_card);
++        if (versionCard != null) {
++            // Tapping the card opens the firmware details page directly.
++            versionCard.setOnClickListener(v -> {
++                final Context context = getContext();
++                if (context == null) {
++                    return;
++                }
++                new SubSettingLauncher(context)
++                        .setDestination(FirmwareVersionSettings.class.getName())
++                        .setSourceMetricsCategory(getMetricsCategory())
++                        .launch();
++            });
++        }
++
++        mStorageWave = headerPreference.findViewById(R.id.storage_wave);
++        mStorageValue = headerPreference.findViewById(R.id.storage_value);
++        updateStorageCard();
++        final View storageCard = headerPreference.findViewById(R.id.storage_card);
++        if (storageCard != null) {
++            // Tapping the card opens the Storage settings page.
++            storageCard.setOnClickListener(v -> {
++                final Context context = getContext();
++                if (context == null) {
++                    return;
++                }
++                new SubSettingLauncher(context)
++                        .setDestination(StorageDashboardFragment.class.getName())
++                        .setSourceMetricsCategory(getMetricsCategory())
++                        .setArguments(new Bundle())
++                        .launch();
++            });
++        }
++        updateSpecsCard(headerPreference);
++    }
++
++    private void updateStorageCard() {
++        if (mStorageWave == null) {
++            return;
++        }
++        final Context context = getContext();
++        if (context == null) {
++            return;
++        }
++        // Fill matches the icon circles; the track blends into the card background,
++        // exactly like the reference design.
++        final int fillColor = context.getColor(
++                com.android.settingslib.widget.theme.R.color
++                        .settingslib_materialColorSecondaryContainer);
++        final int trackColor = context.getColor(
++                com.android.settingslib.widget.theme.R.color
++                        .settingslib_materialColorSurfaceBright);
++        mStorageWave.setColors(trackColor, fillColor);
++        // Same source as the Storage settings page so the numbers always match.
++        final Context appContext = context.getApplicationContext();
++        ThreadUtils.postOnBackgroundThread(() -> {
++            long totalBytes = 0L;
++            long freeBytes = 0L;
++            final StorageManager storageManager =
++                    appContext.getSystemService(StorageManager.class);
++            if (storageManager != null) {
++                try {
++                    final PrivateStorageInfo storageInfo =
++                            PrivateStorageInfo.getPrivateStorageInfo(
++                                    new StorageManagerVolumeProvider(storageManager));
++                    totalBytes = storageInfo.totalBytes;
++                    freeBytes = storageInfo.freeBytes;
++                } catch (Exception e) {
++                    Log.w(LOG_TAG, "Unable to load storage info", e);
++                }
++            }
++            final long usedBytes = Math.max(0L, totalBytes - freeBytes);
++            final float fraction = totalBytes > 0 ? (float) usedBytes / totalBytes : 0f;
++            final String value = appContext.getString(R.string.my_device_info_storage_used,
++                    toWholeGigabytes(usedBytes), toWholeGigabytes(totalBytes));
++            ThreadUtils.postOnMainThread(() -> {
++                if (mStorageWave == null) {
++                    return;
++                }
++                mStorageWave.setProgress(fraction);
++                if (mStorageValue != null) {
++                    mStorageValue.setText(value);
++                }
++            });
++        });
++    }
++
++    private static long toWholeGigabytes(long bytes) {
++        return Math.round(bytes / 1_000_000_000d);
++    }
++
++    private void updateSpecsCard(LayoutPreference headerPreference) {
++        setHeaderText(headerPreference, R.id.spec_processor, getSocInfo());
++        setHeaderText(headerPreference, R.id.spec_ram, getTotalRam());
++        setHeaderText(headerPreference, R.id.spec_display, getDisplaySize());
++        setHeaderText(headerPreference, R.id.spec_battery, getBatteryCapacity());
++    }
++
++    private void setHeaderText(LayoutPreference headerPreference, int viewId,
++            CharSequence text) {
++        final TextView view = headerPreference.findViewById(viewId);
++        if (view != null) {
++            view.setText(text);
++        }
++    }
++
++    private String getSocInfo() {
++        String model = SystemProperties.get("ro.soc.model", "");
++        if (model.isEmpty()) {
++            model = Build.HARDWARE;
++        }
++        final String manufacturer = SystemProperties.get("ro.soc.manufacturer", "");
++        if (!manufacturer.isEmpty()) {
++            return model + " (" + manufacturer + ")";
++        }
++        if (!Build.HARDWARE.isEmpty() && !Build.HARDWARE.equals(model)) {
++            return model + " (" + Build.HARDWARE + ")";
++        }
++        return model;
++    }
++
++    private String getTotalRam() {
++        final Context context = getContext();
++        if (context != null) {
++            final ActivityManager activityManager = context.getSystemService(
++                    ActivityManager.class);
++            if (activityManager != null) {
++                final ActivityManager.MemoryInfo memoryInfo =
++                        new ActivityManager.MemoryInfo();
++                activityManager.getMemoryInfo(memoryInfo);
++                // totalMem excludes memory reserved by hardware, so round up to the
++                // marketed physical size (e.g. ~7.x GiB on an 8 GB device -> 8 GB).
++                final long gigabytes =
++                        (long) Math.ceil(memoryInfo.totalMem / (1024d * 1024d * 1024d));
++                return getString(R.string.my_device_info_ram_size, gigabytes);
++            }
++        }
++        return getString(R.string.unknown);
++    }
++
++    private String getDisplaySize() {
++        final Context context = getContext();
++        if (context != null) {
++            final WindowManager windowManager = context.getSystemService(
++                    WindowManager.class);
++            if (windowManager != null) {
++                final Rect bounds = windowManager.getCurrentWindowMetrics().getBounds();
++                return bounds.width() + " × " + bounds.height();
++            }
++        }
++        return getString(R.string.unknown);
++    }
++
++    private String getBatteryCapacity() {
++        final Context context = getContext();
++        if (context != null) {
++            final Intent batteryIntent = BatteryUtils.getBatteryIntent(context);
++            if (batteryIntent != null) {
++                final int capacityUah = batteryIntent.getIntExtra(
++                        BatteryManager.EXTRA_DESIGN_CAPACITY, -1);
++                if (capacityUah > 0) {
++                    return context.getString(R.string.battery_design_capacity_summary,
++                            capacityUah / 1000);
++                }
++            }
++        }
++        return getString(R.string.unknown);
++    }
++
++    private String getBannerTitle() {
++        final Context context = getContext();
++        if (context != null) {
++            final String title = Settings.Global.getString(context.getContentResolver(),
++                    SETTINGS_KEY_BANNER_TITLE);
++            if (!TextUtils.isEmpty(title)) {
++                return title;
++            }
++        }
++        return getString(R.string.my_device_info_banner_title);
++    }
++
++    private void updateBannerTitle() {
++        if (mBannerTitleView == null) {
++            return;
++        }
++        final String title = getBannerTitle();
++        mBannerTitleView.setText(title);
++        if (mBannerCard != null) {
++            mBannerCard.setContentDescription(
++                    getString(R.string.my_device_info_banner_title_dialog_title) + ", " + title);
++        }
++    }
++
++    private void showBannerTitleEditDialog() {
++        final Context context = getContext();
++        if (context == null) {
++            return;
++        }
++        final EditText input = new EditText(context);
++        input.setInputType(InputType.TYPE_CLASS_TEXT);
++        input.setText(getBannerTitle());
++        input.selectAll();
++        final FrameLayout container = new FrameLayout(context);
++        container.addView(input, new FrameLayout.LayoutParams(
++                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
++        final int padding = context.getResources().getDimensionPixelSize(
++                R.dimen.about_phone_device_name_dialog_padding);
++        container.setPadding(padding, padding, padding, padding);
++        new AlertDialog.Builder(context)
++                .setTitle(R.string.my_device_info_banner_title_dialog_title)
++                .setView(container)
++                .setPositiveButton(android.R.string.ok, (dialog, which) -> {
++                    String value = input.getText().toString().trim();
++                    if (value.isEmpty()) {
++                        value = getString(R.string.my_device_info_banner_title);
++                    }
++                    Settings.Global.putString(context.getContentResolver(),
++                            SETTINGS_KEY_BANNER_TITLE, value);
++                    updateBannerTitle();
++                })
++                .setNegativeButton(android.R.string.cancel, null /* dismiss */)
++                .show();
++    }
++
++    private void updateBannerWallpaper() {
++        if (mBannerWallpaperView == null) {
++            return;
++        }
++        final Context context = getContext();
++        if (context == null) {
++            return;
++        }
++        final WallpaperManager wallpaperManager = context.getSystemService(
++                WallpaperManager.class);
++        if (wallpaperManager == null) {
++            return;
++        }
++        try {
++            final Drawable wallpaper = wallpaperManager.getDrawable();
++            if (wallpaper != null) {
++                mBannerWallpaperView.setImageDrawable(wallpaper);
++            }
++        } catch (Exception e) {
++            Log.w(LOG_TAG, "Unable to load wallpaper for header banner", e);
++        }
++    }
++
++    private void updateDeviceNameCard() {
++        if (mDeviceNameValueView == null) {
++            return;
++        }
++        final String deviceName = getDeviceName();
++        mDeviceNameValueView.setText(deviceName);
++        if (mDeviceNameCard != null) {
++            mDeviceNameCard.setContentDescription(
++                    getString(R.string.my_device_info_device_name_preference_title)
++                            + ", " + deviceName);
++        }
++    }
++
++    private String getDeviceName() {
++        final Context context = getContext();
++        if (context != null) {
++            final String deviceName = Settings.Global.getString(context.getContentResolver(),
++                    Settings.Global.DEVICE_NAME);
++            if (deviceName != null) {
++                return deviceName;
++            }
++        }
++        return Build.MODEL;
++    }
++
++    private void showDeviceNameEditDialog() {
++        final Context context = getContext();
++        if (context == null) {
++            return;
++        }
++        final EditText input = new EditText(context);
++        input.setInputType(InputType.TYPE_CLASS_TEXT);
++        input.setText(getDeviceName());
++        input.selectAll();
++        final FrameLayout container = new FrameLayout(context);
++        container.addView(input, new FrameLayout.LayoutParams(
++                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
++        final int padding = context.getResources().getDimensionPixelSize(
++                R.dimen.about_phone_device_name_dialog_padding);
++        container.setPadding(padding, padding, padding, padding);
++        final AlertDialog dialog = new AlertDialog.Builder(context)
++                .setTitle(R.string.my_device_info_device_name_preference_title)
++                .setView(container)
++                .setPositiveButton(android.R.string.ok, null /* listener set below */)
++                .setNegativeButton(android.R.string.cancel, null /* dismiss */)
++                .create();
++        dialog.setOnShowListener(d -> dialog.getButton(AlertDialog.BUTTON_POSITIVE)
++                .setOnClickListener(v -> {
++                    final String value = input.getText().toString();
++                    final WifiDeviceNameTextValidator validator =
++                            new WifiDeviceNameTextValidator();
++                    if (!validator.isTextValid(value)) {
++                        input.setError(validator.getErrorMessage(value));
++                        return;
++                    }
++                    dialog.dismiss();
++                    mPendingDeviceName = value;
++                    showDeviceNameWarningDialog(value);
++                }));
++        dialog.show();
++    }
++
++    private void registerHeaderObservers() {
++        final Context context = getContext();
++        if (context == null) {
++            return;
++        }
++        if (mWallpaperChangedReceiver == null) {
++            mWallpaperChangedReceiver = new BroadcastReceiver() {
++                @Override
++                public void onReceive(Context context, Intent intent) {
++                    updateBannerWallpaper();
++                }
++            };
++        }
++        context.registerReceiver(mWallpaperChangedReceiver,
++                new IntentFilter(Intent.ACTION_WALLPAPER_CHANGED),
++                Context.RECEIVER_NOT_EXPORTED);
++        if (mDeviceNameObserver == null) {
++            mDeviceNameObserver = new ContentObserver(new Handler(Looper.getMainLooper())) {
++                @Override
++                public void onChange(boolean selfChange) {
++                    updateDeviceNameCard();
++                }
++            };
++        }
++        context.getContentResolver().registerContentObserver(
++                Settings.Global.getUriFor(Settings.Global.DEVICE_NAME),
++                false /* notifyForDescendants */, mDeviceNameObserver);
++    }
++
++    private void unregisterHeaderObservers() {
++        final Context context = getContext();
++        if (context == null) {
++            return;
++        }
++        if (mWallpaperChangedReceiver != null) {
++            context.unregisterReceiver(mWallpaperChangedReceiver);
++        }
++        if (mDeviceNameObserver != null) {
++            context.getContentResolver().unregisterContentObserver(mDeviceNameObserver);
++        }
+     }
+ 
+-    @Override
+     public void showDeviceNameWarningDialog(String deviceName) {
+         DeviceNameWarningDialog.show(this);
+     }
+ 
+     public void onSetDeviceNameConfirm(boolean confirm) {
+-        final DeviceNamePreferenceController controller = use(
+-                DeviceNamePreferenceController.class);
+-        controller.updateDeviceName(confirm);
++        final Context context = getContext();
++        if (confirm && context != null && mPendingDeviceName != null) {
++            // Same helper used by the catalyst migration path: updates Settings.Global,
++            // the Bluetooth name and the hotspot SSID.
++            UtilsKt.updateDeviceName(context, mPendingDeviceName);
++            updateDeviceNameCard();
++        }
++        mPendingDeviceName = null;
+     }
+ 
+     @Override
+diff --git a/src/com/android/settings/deviceinfo/aboutphone/StorageUsageView.java b/src/com/android/settings/deviceinfo/aboutphone/StorageUsageView.java
+new file mode 100644
+index 00000000000..abafd6334e5
+--- /dev/null
++++ b/src/com/android/settings/deviceinfo/aboutphone/StorageUsageView.java
+@@ -0,0 +1,138 @@
++/*
++ * Copyright (C) 2026 The Android Open Source Project
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *      http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++
++package com.android.settings.deviceinfo.aboutphone;
++
++import android.animation.ValueAnimator;
++import android.content.Context;
++import android.graphics.Canvas;
++import android.graphics.Color;
++import android.graphics.Paint;
++import android.graphics.Path;
++import android.util.AttributeSet;
++import android.view.View;
++import android.view.animation.DecelerateInterpolator;
++
++/**
++ * A storage usage bar that fills sideways with a solid color.
++ *
++ * <p>The fill level animates from empty to the target progress on first display. Colors are set
++ * from the Material theme so the bar always matches light/dark mode.
++ */
++public class StorageUsageView extends View {
++
++    private static final long PROGRESS_DURATION_MS = 1100;
++    private static final float CORNER_RADIUS_DP = 20f;
++
++    private final Paint mTrackPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
++    private final Paint mFillPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
++    private final Path mClipPath = new Path();
++
++    private final float mCornerRadiusPx;
++
++    private float mProgress;
++    private float mTargetProgress;
++    private ValueAnimator mProgressAnimator;
++
++    public StorageUsageView(Context context) {
++        this(context, null /* attrs */);
++    }
++
++    public StorageUsageView(Context context, AttributeSet attrs) {
++        this(context, attrs, 0 /* defStyleAttr */);
++    }
++
++    public StorageUsageView(Context context, AttributeSet attrs, int defStyleAttr) {
++        super(context, attrs, defStyleAttr);
++        final float density = context.getResources().getDisplayMetrics().density;
++        mCornerRadiusPx = CORNER_RADIUS_DP * density;
++        setColors(Color.DKGRAY /* trackColor */, Color.GRAY /* fillColor */);
++    }
++
++    /** Sets the bar colors. */
++    public void setColors(int trackColor, int fillColor) {
++        mTrackPaint.setColor(trackColor);
++        mFillPaint.setColor(fillColor);
++        invalidate();
++    }
++
++    /** Animates the fill level to {@code progress} (0..1). Safe to call before attach. */
++    public void setProgress(float progress) {
++        mTargetProgress = Math.max(0f, Math.min(1f, progress));
++        animateProgress();
++    }
++
++    @Override
++    protected void onAttachedToWindow() {
++        super.onAttachedToWindow();
++        animateProgress();
++    }
++
++    @Override
++    protected void onDetachedFromWindow() {
++        if (mProgressAnimator != null) {
++            mProgressAnimator.cancel();
++            mProgressAnimator = null;
++        }
++        super.onDetachedFromWindow();
++    }
++
++    @Override
++    protected void onSizeChanged(int w, int h, int oldw, int oldh) {
++        super.onSizeChanged(w, h, oldw, oldh);
++        mClipPath.rewind();
++        mClipPath.addRoundRect(0, 0, w, h, mCornerRadiusPx, mCornerRadiusPx,
++                Path.Direction.CW);
++    }
++
++    @Override
++    protected void onDraw(Canvas canvas) {
++        super.onDraw(canvas);
++        final float width = getWidth();
++        final float height = getHeight();
++        if (width <= 0 || height <= 0) {
++            return;
++        }
++        canvas.drawRoundRect(0, 0, width, height, mCornerRadiusPx, mCornerRadiusPx,
++                mTrackPaint);
++        if (mProgress <= 0f) {
++            return;
++        }
++        canvas.save();
++        canvas.clipPath(mClipPath);
++        canvas.drawRect(0, 0, width * mProgress, height, mFillPaint);
++        canvas.restore();
++    }
++
++    private void animateProgress() {
++        if (!isAttachedToWindow()) {
++            // onAttachedToWindow() will pick up mTargetProgress.
++            return;
++        }
++        if (mProgressAnimator != null) {
++            mProgressAnimator.cancel();
++        }
++        mProgressAnimator = ValueAnimator.ofFloat(mProgress, mTargetProgress);
++        mProgressAnimator.setDuration(PROGRESS_DURATION_MS);
++        mProgressAnimator.setInterpolator(new DecelerateInterpolator());
++        mProgressAnimator.addUpdateListener(
++                animation -> {
++                    mProgress = (float) animation.getAnimatedValue();
++                    invalidate();
++                });
++        mProgressAnimator.start();
++    }
++}
+diff --git a/src/com/android/settings/deviceinfo/firmwareversion/FirmwareVersionScreen.kt b/src/com/android/settings/deviceinfo/firmwareversion/FirmwareVersionScreen.kt
+index 005827ab15a..8948b33174c 100644
+--- a/src/com/android/settings/deviceinfo/firmwareversion/FirmwareVersionScreen.kt
++++ b/src/com/android/settings/deviceinfo/firmwareversion/FirmwareVersionScreen.kt
+@@ -71,13 +71,10 @@ open class FirmwareVersionScreen : PreferenceScreenMixin, PreferenceSummaryProvi
+     override fun getPreferenceHierarchy(context: Context, coroutineScope: CoroutineScope) =
+         preferenceHierarchy(context) {
+             +FirmwareVersionDetailPreference()
+-            +LineageVersionDetailPreference()
+             +SecurityPatchLevelPreference()
+-            +LineageVendorSecurityPatchLevelPreference()
+             +MainlineModuleVersionPreference()
+             +BasebandVersionPreference()
+             +KernelVersionPreference()
+-            +LineageBuildDatePreference()
+             +SimpleBuildNumberPreference()
+         }
+ 

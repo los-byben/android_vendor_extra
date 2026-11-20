@@ -1,0 +1,55 @@
+From 4337de3dd9b4255d0c299f1a734a51c7dc7dbee6 Mon Sep 17 00:00:00 2001
+From: Adithya R <gh0strider.2k18.reborn@gmail.com>
+Date: Tue, 20 Aug 2024 08:50:50 +0530
+Subject: [PATCH] sepolicy: Add support for LMOFreeform service
+
+Change-Id: I308176f8b186ecf365e4b98ac792c2f5e9872335
+Signed-off-by: Pranav Vashi <neobuddy89@gmail.com>
+---
+ common/private/priv_app.te      | 1 +
+ common/private/service.te       | 3 +++
+ common/private/service_contexts | 3 +++
+ common/private/system_server.te | 3 +++
+ 4 files changed, 10 insertions(+)
+ create mode 100644 common/private/priv_app.te
+
+diff --git a/common/private/priv_app.te b/common/private/priv_app.te
+new file mode 100644
+index 0000000..d902eb2
+--- /dev/null
++++ b/common/private/priv_app.te
+@@ -0,0 +1 @@
++allow priv_app lmo_freeform_service:service_manager find;
+diff --git a/common/private/service.te b/common/private/service.te
+index c570430..6dcb698 100644
+--- a/common/private/service.te
++++ b/common/private/service.te
+@@ -6,3 +6,6 @@ type lineage_livedisplay_service, system_api_service, system_server_service, ser
+ type lineage_profile_service, system_api_service, system_server_service, service_manager_type;
+ type lineage_sensitive_phone_numbers_service, system_api_service, system_server_service, service_manager_type;
+ type lineage_trust_service, system_api_service, system_server_service, service_manager_type;
++
++# Freeform
++type lmo_freeform_service, system_api_service, system_server_service, service_manager_type;
+diff --git a/common/private/service_contexts b/common/private/service_contexts
+index eee1784..a3ef105 100644
+--- a/common/private/service_contexts
++++ b/common/private/service_contexts
+@@ -7,3 +7,6 @@ lineagetrust                              u:object_r:lineage_trust_service:s0
+ profile                                   u:object_r:lineage_profile_service:s0
+ 
+ adbroot_service                           u:object_r:adbroot_service:s0
++
++# Freeform
++lmo_freeform                              u:object_r:lmo_freeform_service:s0
+diff --git a/common/private/system_server.te b/common/private/system_server.te
+index d2fbdf5..37dc287 100644
+--- a/common/private/system_server.te
++++ b/common/private/system_server.te
+@@ -13,3 +13,6 @@ get_prop(system_server, camera2_extensions_prop)
+ 
+ # Let system server toggle xtra-daemon
+ set_prop(system_server, xtra_control_prop)
++
++# Freeform
++add_service(system_server, lmo_freeform_service);

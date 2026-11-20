@@ -1,0 +1,29 @@
+From 7e250ed1ef630bdc650744b8452397a766d7215c Mon Sep 17 00:00:00 2001
+From: minaripenguin <minaripenguin@users.noreply.github.com>
+Date: Sat, 20 Jul 2024 20:11:34 +0800
+Subject: [PATCH 20/21] wm: Ensure freeform tasks bounds gets updated when
+ launching tasks
+
+Signed-off-by: minaripenguin <minaripenguin@users.noreply.github.com>
+Signed-off-by: Pranav Vashi <neobuddy89@gmail.com>
+---
+ .../java/com/android/server/wm/ActivityTaskSupervisor.java  | 6 ++++++
+ 1 file changed, 6 insertions(+)
+
+diff --git a/services/core/java/com/android/server/wm/ActivityTaskSupervisor.java b/services/core/java/com/android/server/wm/ActivityTaskSupervisor.java
+index 3a483eeb6140..f0bd0287df6f 100644
+--- a/services/core/java/com/android/server/wm/ActivityTaskSupervisor.java
++++ b/services/core/java/com/android/server/wm/ActivityTaskSupervisor.java
+@@ -3086,6 +3086,12 @@ public class ActivityTaskSupervisor implements RecentTasks.Callbacks {
+                     mService.continueWindowLayout();
+                 }
+             }
++            if (activityOptions != null) {
++                final int windowingMode = activityOptions.getLaunchWindowingMode();
++                if (windowingMode == WINDOWING_MODE_FREEFORM) {
++                    task.setBounds(activityOptions.getLaunchBounds());
++                }
++            }
+             taskCallingUid = task.mCallingUid;
+             callingPackage = task.mCallingPackage;
+             callingFeatureId = task.mCallingFeatureId;

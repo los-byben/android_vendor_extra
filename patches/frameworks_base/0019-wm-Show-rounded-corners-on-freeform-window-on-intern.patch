@@ -1,0 +1,90 @@
+From d2f848339f78d2f1f8849dc75d63414f1f498788 Mon Sep 17 00:00:00 2001
+From: Adithya R <gh0strider.2k18.reborn@gmail.com>
+Date: Thu, 31 Oct 2024 09:01:57 +0530
+Subject: [PATCH 19/21] wm: Show rounded corners on freeform window on internal
+ display
+
+Change-Id: I743aba4200a4d8786c09811de8a2cf5c574b885f
+Co-authored-by: Pranav Vashi <neobuddy89@gmail.com>
+Signed-off-by: Pranav Vashi <neobuddy89@gmail.com>
+---
+ .../windowdecor/CaptionWindowDecoration.java  | 24 ++++++++++++++++---
+ 1 file changed, 21 insertions(+), 3 deletions(-)
+
+diff --git a/libs/WindowManager/Shell/src/com/android/wm/shell/windowdecor/CaptionWindowDecoration.java b/libs/WindowManager/Shell/src/com/android/wm/shell/windowdecor/CaptionWindowDecoration.java
+index 2ef399fa9c98..306f4faf83c8 100644
+--- a/libs/WindowManager/Shell/src/com/android/wm/shell/windowdecor/CaptionWindowDecoration.java
++++ b/libs/WindowManager/Shell/src/com/android/wm/shell/windowdecor/CaptionWindowDecoration.java
+@@ -34,6 +34,7 @@ import android.app.WindowConfiguration.WindowingMode;
+ import android.content.Context;
+ import android.content.res.ColorStateList;
+ import android.content.res.Resources;
++import android.content.res.TypedArray;
+ import android.graphics.Color;
+ import android.graphics.Insets;
+ import android.graphics.Point;
+@@ -54,6 +55,7 @@ import android.view.WindowManager;
+ import android.view.WindowManagerGlobal;
+ import android.window.WindowContainerTransaction;
+ 
++import com.android.internal.policy.ScreenDecorationsUtils;
+ import com.android.internal.annotations.VisibleForTesting;
+ import com.android.wm.shell.R;
+ import com.android.wm.shell.ShellTaskOrganizer;
+@@ -226,7 +228,7 @@ public class CaptionWindowDecoration extends WindowDecoration<WindowDecorLinearL
+             boolean shouldSetTaskVisibilityPositionAndCrop,
+             boolean isStatusBarVisible,
+             boolean isKeyguardVisibleAndOccluded,
+-            InsetsState displayInsetsState,
++            DisplayController displayController,
+             boolean hasGlobalFocus,
+             @NonNull Region globalExclusionRegion,
+             boolean shouldSetBackground,
+@@ -244,6 +246,8 @@ public class CaptionWindowDecoration extends WindowDecoration<WindowDecorLinearL
+                 || (isStatusBarVisible && !isKeyguardVisibleAndOccluded);
+         relayoutParams.mDisplayExclusionRegion.set(globalExclusionRegion);
+         relayoutParams.mInSyncWithTransition = inSyncWithTransition;
++        relayoutParams.mCornerRadius =
++                getCornerRadius(context, displayController.getDisplay(taskInfo.displayId));
+ 
+         if (TaskInfoKt.isTransparentCaptionBarAppearance(taskInfo)) {
+             // If the app is requesting to customize the caption bar, allow input to fall
+@@ -263,7 +267,8 @@ public class CaptionWindowDecoration extends WindowDecoration<WindowDecorLinearL
+         );
+ 
+         relayoutParams.mCaptionTopPadding = getTopPadding(relayoutParams,
+-                taskInfo.getConfiguration().windowConfiguration.getBounds(), displayInsetsState);
++                taskInfo.getConfiguration().windowConfiguration.getBounds(),
++                displayController.getInsetsState(taskInfo.displayId));
+         // Set opaque background for all freeform tasks to prevent freeform tasks below
+         // from being visible if freeform task window above is translucent.
+         // Otherwise if fluid resize is enabled, add a background to freeform tasks.
+@@ -284,7 +289,7 @@ public class CaptionWindowDecoration extends WindowDecoration<WindowDecorLinearL
+         updateRelayoutParams(mRelayoutParams, mContext, taskInfo, applyStartTransactionOnDraw,
+                 shouldSetTaskVisibilityPositionAndCrop, mIsStatusBarVisible,
+                 mIsKeyguardVisibleAndOccluded,
+-                mDisplayController.getInsetsState(taskInfo.displayId), hasGlobalFocus,
++                mDisplayController, hasGlobalFocus,
+                 globalExclusionRegion, mDesktopConfig.shouldSetBackground(taskInfo),
+                 inSyncWithTransition);
+ 
+@@ -366,6 +371,19 @@ public class CaptionWindowDecoration extends WindowDecoration<WindowDecorLinearL
+         });
+     }
+ 
++    private static int getCornerRadius(Context context, Display display) {
++        // Show rounded corners only on the internal display as we can't get rounded corners for
++        // external displays.
++        if (display.getType() != Display.TYPE_INTERNAL) {
++            return 0;
++        }
++        final TypedArray ta = context.obtainStyledAttributes(
++                new int[]{android.R.attr.dialogCornerRadius});
++        final int cornerRadius = ta.getDimensionPixelSize(0, 0);
++        ta.recycle();
++        return cornerRadius;
++    }
++
+     /**
+      * Sets up listeners when a new root view is created.
+      */

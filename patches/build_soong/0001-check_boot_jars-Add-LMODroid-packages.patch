@@ -1,0 +1,24 @@
+From eacdc11254c79504190a0a4ebe6103932072c58e Mon Sep 17 00:00:00 2001
+From: Dhina17 <dhinalogu@gmail.com>
+Date: Mon, 26 Aug 2024 13:03:55 +0530
+Subject: [PATCH] check_boot_jars: Add LMODroid packages
+
+Signed-off-by: Pranav Vashi <neobuddy89@gmail.com>
+---
+ scripts/check_boot_jars/package_allowed_list.txt | 3 +++
+ 1 file changed, 3 insertions(+)
+
+diff --git a/scripts/check_boot_jars/package_allowed_list.txt b/scripts/check_boot_jars/package_allowed_list.txt
+index 335d29c59b..f39e0e30f4 100644
+--- a/scripts/check_boot_jars/package_allowed_list.txt
++++ b/scripts/check_boot_jars/package_allowed_list.txt
+@@ -217,6 +217,9 @@ vendor\.google_clockwork\.displayoffload3\..*
+ lineageos\.platform
+ org\.lineageos\.platform\.internal
+ 
++# LMODroid adds
++com\.libremobileos\..*
++
+ # MTK adds
+ com\.mediatek
+ com\.mediatek\..*
